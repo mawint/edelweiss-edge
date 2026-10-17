@@ -1,0 +1,42 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "port": 5200
+    },
+    {
+      "name": "preview",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "preview",
+        "--",
+        "--port",
+        "4200",
+        "--strictPort"
+      ],
+      "port": 4200
+    },
+    {
+      "name": "preview-stake",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "preview",
+        "--",
+        "--mode",
+        "stake",
+        "--port",
+        "4201",
+        "--strictPort"
+      ],
+      "port": 4201
+    }
+  ]
+}

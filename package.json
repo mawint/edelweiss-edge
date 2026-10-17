@@ -1,0 +1,28 @@
+{
+  "name": "edelweiss-edge",
+  "version": "1.0.0",
+  "description": "",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "dev": "vite --host",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "qa:build-ref": "node qa/build-ref.mjs",
+    "qa:serve": "node qa/lib/serve.mjs",
+    "test": "vitest run",
+    "build:stake": "tsc && vite build --mode stake"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "typescript": "^5.9.3",
+    "vite": "^6.4.3",
+    "vitest": "^5.0.3"
+  },
+  "type": "module",
+  "private": true
+}

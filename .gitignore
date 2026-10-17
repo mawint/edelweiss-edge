@@ -1,0 +1,13 @@
+node_modules
+dist
+dist-stake
+
+# QA harness output
+qa/results
+qa/builds
+
+# secrets: never committed (this repo is public). The demo's password is a Netlify environment variable.
+.env
+.env.*
+*.pem
+*.key

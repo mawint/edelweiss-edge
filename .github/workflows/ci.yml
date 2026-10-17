@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# a newer push to the same branch or PR replaces the run in progress
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Test, type-check and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # the game must match the math it plays (windows, pays) and stage every book exactly
+      - run: npm test
+      # the same command Netlify deploys with: tsc, then vite build
+      - run: npm run build
+      # the build Stake gets: no prototype tools, relative paths (dist-stake/)
+      - run: npm run build:stake
