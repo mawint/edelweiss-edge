@@ -78,12 +78,26 @@ button small, .where small, .odds small, .balance small { display: block; font-w
   .pays { font-size: 16px; }
   .climb { font-size: 16px; padding: 4px 10px 2px; border-width: 2px; box-shadow: 0 2px 0 var(--ink); }
 }
-/* Phones in portrait: the deck stacks in rows under the mountain */
+/* Phones in portrait: three short rows (difficulty; window and pay; bet and Climb), with the balance and
+   sound on a tab above the deck so the mountain keeps the room */
 @media (max-width: 560px) {
-  .deck { gap: 6px; }
-  .diffs { width: 100%; justify-content: center; }
-  .diffs button { font-size: 12px; padding: 4px 6px; }
-  .climb { order: 5; width: 100%; }
+  .deck { gap: 6px; padding: 8px; }
+  .diffs { width: 100%; justify-content: space-between; gap: 4px; }
+  .diffs button { font-size: 12px; padding: 3px 6px; min-height: 36px; flex: 1; }
+  .stepper { flex: 1 1 60%; justify-content: space-between; }
+  .odds { flex: 0 0 auto; }
+  .where b, .where small { white-space: nowrap; }
+  .bet { order: 4; }
+  .stepper button, .bet button { width: 36px; min-height: 36px; }
+  .where { min-width: 0; }
+  .bet .where { min-width: 3.6em; }
+  .climb { order: 5; flex: 1; font-size: 24px; padding: 6px 10px 2px; }
+  .meta {
+    position: absolute; right: 14px; bottom: 100%; display: flex; align-items: center; gap: 8px;
+    background: var(--cream); border: 3px solid var(--ink); border-bottom: 0; border-radius: 12px 12px 0 0; padding: 3px 10px;
+  }
+  .balance small { display: inline; }
+  .balance b { font-size: 13px; }
 }
 /* Short beats narrow: the popout is both, and the mountain needs the room more than the labels do */
 @media (max-height: 300px) {

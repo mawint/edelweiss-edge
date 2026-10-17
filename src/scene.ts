@@ -5,13 +5,18 @@ import type { Window } from './book';
 import { play } from './sound';
 
 export const TOP = 25;
-const SW = 104, SH = 46, CAP = 30;
-const EDGE_X = (TOP + 1) * SW;
+// Step size. Portrait screens get narrower, taller steps so the ridge climbs up the screen instead of
+// leaving it mostly sky; the odds never depend on how the ridge is drawn.
+let SW = 104, SH = 46;
+let PORTRAIT = false;
+const CAP = 30;
+const edgeX = () => (TOP + 1) * SW;
 const stepTop = (i: number) => -Math.max(0, Math.min(i, TOP)) * SH;
-const stand = (i: number) => (i > TOP ? { x: EDGE_X + 50, y: stepTop(TOP) } : { x: i * SW + SW / 2, y: stepTop(i) });
+const stand = (i: number) => (i > TOP ? { x: edgeX() + 50, y: stepTop(TOP) } : { x: i * SW + SW / 2, y: stepTop(i) });
 const topAtX = (x: number) => stepTop(Math.max(0, Math.min(TOP, Math.floor(x / SW))));
 /** The whole ridge, flags included, for the overview camera. */
-const RIDGE = { x0: -260, x1: EDGE_X + 220, y0: stepTop(TOP) - 170, y1: 60 };
+const ridge = () =>
+  PORTRAIT ? { x0: -90, x1: edgeX() + 110, y0: stepTop(TOP) - 160, y1: 40 } : { x0: -260, x1: edgeX() + 220, y0: stepTop(TOP) - 170, y1: 60 };
 
 const C = {
   ink: '#24152E', grass: '#6CCB57', grassD: '#3F9446', rock: '#B3A3D2', rockD: '#8676A8', snow: '#FFFFFF', snowD: '#C6CFF2',
@@ -126,6 +131,13 @@ export class Scene {
     this.canvas.height = Math.max(1, Math.round(r.height * dpr));
     const aspect = r.width / Math.max(1, r.height);
     if (aspect >= 1) { this.H = 540; this.W = 540 * aspect; } else { this.W = 600; this.H = 600 / aspect; }
+    const portrait = aspect < 0.8;
+    if (portrait !== PORTRAIT) {
+      PORTRAIT = portrait;
+      [SW, SH] = portrait ? [58, 84] : [104, 46];
+      // (between rounds Ueli just moves with his step; mid-round the next hop catches up)
+      if (this.u) this.placeAt(this.u.step);
+    }
   }
   /** How much of the canvas the HTML controls cover, in CSS pixels. */
   setInsets(topPx: number, bottomPx: number) {
@@ -135,8 +147,9 @@ export class Scene {
   }
   private overview() {
     const viewH = this.H - this.inset.top - this.inset.bottom - 30;
-    const z = Math.min(this.W / (RIDGE.x1 - RIDGE.x0), viewH / (RIDGE.y1 - RIDGE.y0));
-    return { x: (RIDGE.x0 + RIDGE.x1) / 2, y: (RIDGE.y0 + RIDGE.y1) / 2 + ((this.inset.bottom - this.inset.top) / 2) / z, z };
+    const R = ridge();
+    const z = Math.min(this.W / (R.x1 - R.x0), viewH / (R.y1 - R.y0));
+    return { x: (R.x0 + R.x1) / 2, y: (R.y0 + R.y1) / 2 + ((this.inset.bottom - this.inset.top) / 2) / z, z };
   }
 
   // ---------- dragging the window in frame ----------
@@ -206,8 +219,10 @@ export class Scene {
     if (this.mode === 'overview') t = this.overview();
     else if (this.mode === 'fall') t = { x: u.x - 40, y: u.y - 90, z: 0.85 };
     else {
-      const z = lerp(1.05, 1.45, this.tension) * Math.min(1, this.W / 700);
-      t = { x: u.x + 120 / z, y: u.y - 100 + ((this.inset.bottom - this.inset.top) / 2) / z, z };
+      const z = lerp(1.05, 1.45, this.tension) * (PORTRAIT ? 1 : Math.min(1, this.W / 700));
+      // Look ahead, up the ridge: sideways in landscape, upward in portrait where the ridge climbs the screen
+      const ahead = PORTRAIT ? { x: 60, y: (this.H - this.inset.top - this.inset.bottom) * 0.2 } : { x: 120, y: 100 };
+      t = { x: u.x + ahead.x / z, y: u.y - ahead.y / z + ((this.inset.bottom - this.inset.top) / 2) / z, z };
     }
     // Follow tighter than the overview swoop, so fast moves (gondola, echo) never leave him off screen
     const stiff = this.mode === 'overview' ? 0.0045 : 0.009;
@@ -315,13 +330,13 @@ export class Scene {
     const stair = () => {
       c.beginPath(); c.moveTo(-900, 0);
       for (let i = 0; i <= TOP; i++) { c.lineTo(i * SW + this.jit(i), stepTop(i) + this.jit(i + 50)); c.lineTo((i + 1) * SW, stepTop(i) + this.jit(i + 99)); }
-      c.lineTo(EDGE_X + this.jit(7), 2400);
+      c.lineTo(edgeX() + this.jit(7), 2400);
     };
     stair(); c.lineTo(-900, 2400); c.closePath();
     c.fillStyle = C.mass; c.fill();
     c.save(); c.clip();
     c.strokeStyle = C.massD; c.lineWidth = 6;
-    for (let k = 0; k < 40; k++) { const y = -1200 + k * 70; c.beginPath(); c.moveTo(-900, y + 300); c.lineTo(EDGE_X + 100, y - 900); c.stroke(); }
+    for (let k = 0; k < 40; k++) { const y = -1200 + k * 70; c.beginPath(); c.moveTo(-900, y + 300); c.lineTo(edgeX() + 100, y - 900); c.stroke(); }
     c.restore();
     const cap = (x0: number, x1: number, top: number, i: number) => {
       const [fill, dark] = i <= 9 ? [C.grass, C.grassD] : i <= 19 ? [C.rock, C.rockD] : [C.snow, C.snowD];
@@ -351,7 +366,7 @@ export class Scene {
     c.beginPath(); c.moveTo(-60, 0); c.lineTo(0, -80); c.lineTo(60, 0); c.closePath(); this.fillInk(C.red, 5);
     c.beginPath(); c.moveTo(-14, 0); c.lineTo(0, -40); c.lineTo(14, 0); c.closePath(); this.fillInk('#5A2030', 4);
     c.restore();
-    c.save(); c.translate(EDGE_X - 14, stepTop(TOP));
+    c.save(); c.translate(edgeX() - 14, stepTop(TOP));
     c.beginPath(); c.moveTo(0, 0); c.lineTo(0, -70); this.ink(7); c.strokeStyle = '#8C6A4A'; c.lineWidth = 3; c.stroke();
     c.beginPath(); c.moveTo(0, -110 + Math.sin(this.clock / 300) * 2); c.lineTo(30, -66); c.lineTo(-30, -66); c.closePath(); this.fillInk(C.gold, 4);
     this.text('!', 0, -80, `30px ${FD}`, C.ink, 0);
@@ -364,10 +379,10 @@ export class Scene {
     const pulse = 0.5 + 0.5 * Math.sin(this.clock / 260);
     if (w === 'edge') {
       const top = stepTop(TOP);
-      const g = c.createLinearGradient(EDGE_X, 0, EDGE_X + 500, 0);
+      const g = c.createLinearGradient(edgeX(), 0, edgeX() + 500, 0);
       g.addColorStop(0, `rgba(226,56,63,${0.35 + 0.15 * pulse})`); g.addColorStop(1, 'rgba(226,56,63,0)');
-      c.fillStyle = g; c.fillRect(EDGE_X, top, 500, 1400);
-      this.flag(EDGE_X + 40, top + 120, 'EDGE', C.red, -1);
+      c.fillStyle = g; c.fillRect(edgeX(), top, 500, 1400);
+      this.flag(edgeX() + 40, top + 120, 'EDGE', C.red, -1);
       return;
     }
     for (let i = w.from; i <= w.to; i++) {
