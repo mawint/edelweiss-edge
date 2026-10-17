@@ -2,49 +2,51 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <title>Edelweiss Edge — prototype</title>
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-    <meta name="theme-color" content="#1d3557" />
+    <meta name="theme-color" content="#0f2236" />
   </head>
   <body>
-    <!-- Placeholder screen: the art style isn't chosen yet. It plays real books through the RGS (or the mock). -->
     <main id="app">
-      <header class="top">
-        <h1>Edelweiss Edge</h1>
-        <p class="tag">Placeholder: no art yet</p>
-        <div class="balance"><small>Balance</small> <b id="balance">…</b></div>
-      </header>
+      <canvas id="scene" aria-label="Ueli on the mountain. Drag on the mountain to move your window."></canvas>
 
-      <section class="ridge-wrap" aria-label="The ridge">
-        <div class="ridge" id="ridge"></div>
-        <div class="callout" id="callout" aria-live="polite"></div>
-      </section>
-
-      <section class="controls">
-        <div class="difficulty" id="difficulty" role="radiogroup" aria-label="Difficulty">
-          <button type="button" data-difficulty="easy">Easy</button>
-          <button type="button" data-difficulty="medium">Medium</button>
-          <button type="button" data-difficulty="hard">Hard</button>
-          <button type="button" data-difficulty="pinpoint">Pinpoint</button>
-          <button type="button" data-difficulty="edge">Over the Edge</button>
+      <section class="deck" id="deck" aria-label="Controls">
+        <div class="grp diffs" role="radiogroup" aria-label="Difficulty">
+          <button type="button" data-difficulty="easy">Easy<small>8 steps</small></button>
+          <button type="button" data-difficulty="medium">Medium<small>5 steps</small></button>
+          <button type="button" data-difficulty="hard">Hard<small>3 steps</small></button>
+          <button type="button" data-difficulty="pinpoint">Pinpoint<small>1 step</small></button>
+          <button type="button" data-difficulty="edge" class="edge">Edge<small>he falls</small></button>
         </div>
-        <label class="slider" id="slider-row">
-          <span>Window</span>
-          <input type="range" id="slider" min="0" max="18" step="1" value="10" />
-          <output id="window-label"></output>
-        </label>
-        <p class="pays" id="pays"></p>
-        <div class="row">
-          <div class="bet">
-            <button type="button" id="bet-down" aria-label="Lower the bet" data-social-label="Lower the play amount">−</button>
-            <span><small data-social="Play amount">Bet</small> <b id="bet">…</b></span>
-            <button type="button" id="bet-up" aria-label="Raise the bet" data-social-label="Raise the play amount">+</button>
-          </div>
-          <button type="button" class="climb" id="climb">Climb</button>
+
+        <div class="grp stepper" id="stepper">
+          <button type="button" id="nudge-down" aria-label="Move the window down a step">◀</button>
+          <div class="where"><b id="window-label">Steps 11–15</b><small id="window-alt">2’552–2’680 m</small></div>
+          <button type="button" id="nudge-up" aria-label="Move the window up a step">▶</button>
+        </div>
+
+        <div class="grp odds">
+          <span class="pays" id="pays">4.0×</span>
+          <small id="chance">wins 1 in 5.4</small>
+        </div>
+
+        <div class="grp bet">
+          <button type="button" id="bet-down" aria-label="Lower the bet" data-social-label="Lower the play amount">−</button>
+          <div class="where"><small data-social="Play amount">Bet</small><b id="bet">…</b></div>
+          <button type="button" id="bet-up" aria-label="Raise the bet" data-social-label="Raise the play amount">+</button>
+        </div>
+
+        <button type="button" class="climb" id="climb">Climb!</button>
+
+        <div class="grp meta">
+          <span class="balance"><small>Balance</small> <b id="balance">…</b></span>
+          <button type="button" class="sound" id="sound" aria-pressed="true">Sound on</button>
         </div>
         <p class="error" id="error" role="alert"></p>
       </section>
+
+      <p class="sr-only" id="callout" aria-live="polite"></p>
     </main>
     <script type="module" src="/src/main.ts"></script>
   </body>

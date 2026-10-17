@@ -10,14 +10,19 @@ Last updated October 17, 2026.
   - blooms are independent of the stop;
   - 92 bet modes, books, optimizer targets and tests.
   See `readme.txt` there. The first pass's 1,000-paths model was replaced.
-- **Placeholder screen:** the 26-step ridge, the difficulty buttons, the window slider and Climb. It plays real books through the RGS (or the mock) and stages each event as a line of text. Blooms appear on the ridge as he reaches them.
+- **The real screen, first pass** (alpine cartoon, ported from the approved prototype):
+  - `src/scene.ts`: the canvas mountain, Ueli, follow-cam, weather, goats, and every feature's moment (gondola, avalanche, echo, föhn, fall, Barry's rescue), hidden blooms bursting as he reaches them, the win stamp.
+  - `src/director.ts`: stages a book event by event; cosmetic choices are seeded from the book id.
+  - `src/sound.ts`: synthesized sound, one mute (review [107]).
+  - The deck: difficulty, the window dragged on the mountain with ◀ ▶ and arrow keys as backup, stake, Climb (space bar, review [228]); no scrolling at any size (review [227]); checked at 1280×720, 425×812 and 400×225.
+  - A resumed round shows where it ended instantly; QA probes stage rounds instantly (`game.state.instant`).
 - **Fixtures:** `fixtures/books.json`, with 3 losses and 3 wins for each of the 92 modes from the math's `export_fixtures.py`, simulated in-process.
 
 ## Next
 1. Settle the open questions in `docs/GAME_DESIGN.md`, the mode count first.
 2. Run the math's `run.py` (optimizer) and check `stats.py`. Then export fixtures from the published books, so every kind of round (rescue, golden bloom) is covered.
-3. Choose the art style. Then build the real ridge, Ueli, each feature's moment and the blooms.
-4. Add the rules screen (from the exported numbers), sound, autoplay and turbo, and replay polish. Then run the Stake build and `engine-review-prompt.md`.
+3. Add the rules screen (from the exported numbers), autoplay (with a confirmation step) and turbo, and replay polish. Then run `engine-review-prompt.md`.
+4. Portrait phones: frame the ridge larger in the overview; the follow-cam is fine.
 
 ## Open questions
 See `docs/GAME_DESIGN.md`, Open questions.

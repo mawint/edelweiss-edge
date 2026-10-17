@@ -15,6 +15,6 @@ Open http://localhost:5200. Sweet Push uses 5173, High Noon Push 5180 and Thunde
 
 `npm run build` makes the hosted demo (`dist/`). `npm run build:stake` makes the Stake upload (`dist-stake/`).
 
-The screen is a placeholder until the art style is chosen: the ridge's 26 steps, a difficulty, a window slider and Climb.
+The screen is the alpine-cartoon mountain on a canvas: drag your window along the ridge (or nudge it with the arrows), pick a difficulty and Climb. Every round is staged from its book.
 
 The hosted demo (Netlify) sits behind a shared password. It's read from the `SITE_PASSWORD` environment variable in the Netlify project, and the site stays shut until it's set.

@@ -1,8 +1,11 @@
-// Placeholder screen for Edelweiss Edge: the ridge's 26 steps, a window slider, and Climb. Every round
-// comes from the RGS (Stake's, the dev server's mock, or the hosted demo's in-page mock) and is staged
-// from its book; the screen never decides an outcome or adds up money. The real art comes later.
+// Edelweiss Edge: the mountain (src/scene.ts), the deck of controls, and the RGS. Every round comes from the
+// RGS (Stake's, the dev server's mock, or the hosted demo's in-page mock) and is staged from its book by
+// src/director.ts; the screen never decides an outcome or adds up money.
 import './style.css';
-import { DIFFICULTIES, FIXTURES, TOP, modeFor, planRound, startsFor, type BetMode, type ClimbPlan, type Difficulty } from './book';
+import { DIFFICULTIES, FIXTURES, modeFor, startsFor, type BetMode, type ClimbPlan, type Difficulty } from './book';
+import { stageRound } from './director';
+import { Scene } from './scene';
+import { setSound, soundOn, unlockSound } from './sound';
 import { MICRO, RgsError, fetchReplay, formatMoney, httpRgs, readLaunch, type Rgs, type RgsRound } from './rgs';
 import { demoRgs } from './rgs-mock';
 
@@ -72,71 +75,45 @@ function devSession() {
   return id ?? `dev-${Math.random().toString(16).slice(2, 10)}`;
 }
 
+
 // ---------- state ----------
 type Choice = Difficulty | 'edge';
 const state = {
   ready: false,
   phase: 'idle' as 'idle' | 'climbing',
-  difficulty: 'easy' as Choice,
-  from: 10,
+  difficulty: 'medium' as Choice,
+  from: 11,
   bet: 1,
   betLevels: [] as number[],
   balance: 0,
   currency: launch.currency,
-  step: 0,
   plan: null as ClimbPlan | null,
-  /** The blooms picked so far this round (they're hidden until he reaches them). */
-  blooms: [] as { step: number; golden: boolean }[],
+  /** QA probes set this to stage rounds without animation. */
+  instant: false,
   history: [] as { mode: BetMode; win: number }[],
 };
 const rgs = connect();
 const money = (v: number) => formatMoney(v, state.currency);
-const widthOf = (d: Difficulty) => FIXTURES.modes[modeFor(d, startsFor(d)[0])!].window as [number, number];
+const scene = new Scene($<HTMLCanvasElement>('scene'));
+const announce = (text: string) => ($('callout').textContent = text);
+const metres = (s: number) => `${(FIXTURES.rules.baseMetres + s * FIXTURES.rules.metresPerStep).toLocaleString('de-CH')} m`;
 
 /** The bet mode the controls point at. */
 function currentMode(): BetMode {
   if (state.difficulty === 'edge') return 'edge';
   return modeFor(state.difficulty, state.from)!;
 }
+const widthOf = (d: Difficulty) => {
+  const [a, b] = FIXTURES.modes[modeFor(d, startsFor(d)[0])!].window as [number, number];
+  return b - a + 1;
+};
 
-// ---------- the ridge ----------
-function buildRidge() {
-  const ridge = $('ridge');
-  for (let s = 0; s <= TOP; s++) {
-    const step = document.createElement('div');
-    step.className = 'step';
-    step.dataset.step = String(s);
-    step.style.setProperty('--h', `${12 + (s / TOP) * 88}%`);
-    step.title = `Step ${s}: ${FIXTURES.rules.baseMetres + s * FIXTURES.rules.metresPerStep} m`;
-    step.innerHTML = `<span class="n">${s}</span>`;
-    ridge.append(step);
-  }
-  const edge = document.createElement('div');
-  edge.className = 'step edge';
-  edge.innerHTML = '<span class="n">edge</span>';
-  ridge.append(edge);
-  const ueli = document.createElement('div');
-  ueli.id = 'ueli';
-  ueli.textContent = 'U';
-  ueli.title = 'Ueli';
-  ridge.append(ueli);
-}
-
-function drawRidge() {
-  const mode = FIXTURES.modes[currentMode()];
-  const [lo, hi] = mode.window === 'edge' ? [TOP + 1, TOP + 1] : mode.window;
-  const blooms = state.blooms;
-  for (const el of document.querySelectorAll<HTMLElement>('.step')) {
-    const s = el.classList.contains('edge') ? TOP + 1 : Number(el.dataset.step);
-    el.classList.toggle('in-window', s >= lo && s <= hi);
-    const bloom = blooms.find((b) => b.step === s);
-    el.classList.toggle('bloom', !!bloom && !bloom.golden);
-    el.classList.toggle('golden', !!bloom?.golden);
-  }
-  const ueli = $('ueli');
-  const at = Math.min(state.step, TOP + 1);
-  ueli.style.setProperty('--at', String(at));
-  ueli.classList.toggle('over', state.step > TOP);
+/** Move the window so it starts on `from`, clamped to the starts this difficulty offers. */
+function moveWindow(from: number) {
+  if (state.difficulty === 'edge' || state.phase !== 'idle') return;
+  const starts = startsFor(state.difficulty);
+  state.from = Math.min(Math.max(from, starts[0]), starts[starts.length - 1]);
+  syncControls();
 }
 
 // ---------- controls ----------
@@ -144,43 +121,46 @@ function syncControls() {
   for (const b of document.querySelectorAll<HTMLButtonElement>('[data-difficulty]')) {
     b.setAttribute('aria-pressed', String(b.dataset.difficulty === state.difficulty));
   }
-  const slider = $<HTMLInputElement>('slider');
-  const row = $('slider-row');
-  row.hidden = state.difficulty === 'edge';
-  if (state.difficulty !== 'edge') {
-    const starts = startsFor(state.difficulty);
-    state.from = Math.min(Math.max(state.from, starts[0]), starts[starts.length - 1]);
-    slider.min = String(starts[0]);
-    slider.max = String(starts[starts.length - 1]);
-    slider.value = String(state.from);
-    const [first, last] = widthOf(state.difficulty);
-    const [lo, hi] = [state.from, state.from + last - first];
-    $('window-label').textContent = lo === hi ? `step ${lo}` : `steps ${lo}–${hi}`;
-  }
+  const edge = state.difficulty === 'edge';
+  if (!edge) moveWindowClamp();
   const mode = FIXTURES.modes[currentMode()];
-  $('pays').textContent = say(`Pays ${mode.pay}× the bet`, `Wins ${mode.pay}× the play amount`) + ` · ${blurb(mode.kinds)}`;
+  const win = mode.window;
+  scene.setWindow(win === 'edge' ? 'edge' : { from: win[0], to: win[1] });
+  $('window-label').textContent = win === 'edge' ? 'Over the edge' : win[0] === win[1] ? `Step ${win[0]}` : `Steps ${win[0]}–${win[1]}`;
+  $('window-alt').textContent = win === 'edge' ? 'past 3’000 m' : win[0] === win[1] ? metres(win[0]) : `${metres(win[0])}–${metres(win[1])}`;
+  $('pays').textContent = `${mode.pay.toFixed(1)}×`;
+  $('pays').setAttribute('aria-label', say(`Pays ${mode.pay} times the bet`, `Wins ${mode.pay} times the play amount`));
+  $('chance').textContent = `wins 1 in ${(1 / (1 - (mode.kinds.loss ?? 0))).toFixed(1)}`;
   $('bet').textContent = money(state.bet);
   $('balance').textContent = money(state.balance);
   const busy = state.phase !== 'idle' || !state.ready;
-  for (const b of document.querySelectorAll<HTMLButtonElement>('.controls button')) b.disabled = busy;
-  slider.disabled = busy;
-  drawRidge();
+  for (const b of document.querySelectorAll<HTMLButtonElement>('.deck button')) b.disabled = busy && b.id !== 'sound';
+  for (const id of ['nudge-down', 'nudge-up']) $<HTMLButtonElement>(id).disabled = busy || edge;
+  scene.dragEnabled = !busy && !edge;
 }
-
-/** How often the chosen bet wins, from the exported odds. */
-const blurb = (kinds: Record<string, number>) => `wins about 1 in ${(1 / (1 - (kinds.loss ?? 0))).toFixed(1)}`;
+function moveWindowClamp() {
+  const starts = startsFor(state.difficulty as Difficulty);
+  state.from = Math.min(Math.max(state.from, starts[0]), starts[starts.length - 1]);
+}
 
 function wireControls() {
   for (const b of document.querySelectorAll<HTMLButtonElement>('[data-difficulty]')) {
     b.addEventListener('click', () => {
+      // Keep the window centred on the same spot when its width changes
+      const oldWidth = state.difficulty === 'edge' ? 1 : widthOf(state.difficulty);
+      const centre = state.from + (oldWidth - 1) / 2;
       state.difficulty = b.dataset.difficulty as Choice;
+      if (state.difficulty !== 'edge') state.from = Math.round(centre - (widthOf(state.difficulty) - 1) / 2);
       syncControls();
     });
   }
-  $<HTMLInputElement>('slider').addEventListener('input', (e) => {
-    state.from = Number((e.target as HTMLInputElement).value);
-    syncControls();
-  });
+  $('nudge-down').addEventListener('click', () => moveWindow(state.from - 1));
+  $('nudge-up').addEventListener('click', () => moveWindow(state.from + 1));
+  // Dragging on the mountain centres the window on the step under the pointer
+  scene.onDrag = (step) => {
+    if (state.difficulty === 'edge') return;
+    moveWindow(step - Math.floor((widthOf(state.difficulty) - 1) / 2));
+  };
   const stepBet = (dir: number) => {
     const i = state.betLevels.indexOf(state.bet);
     state.bet = state.betLevels[Math.min(state.betLevels.length - 1, Math.max(0, i + dir))] ?? state.bet;
@@ -189,35 +169,36 @@ function wireControls() {
   $('bet-down').addEventListener('click', () => stepBet(-1));
   $('bet-up').addEventListener('click', () => stepBet(1));
   $('climb').addEventListener('click', () => void climb());
+  const sound = $<HTMLButtonElement>('sound');
+  const showSound = () => { sound.setAttribute('aria-pressed', String(soundOn())); sound.textContent = soundOn() ? 'Sound on' : 'Sound off'; };
+  sound.addEventListener('click', () => { setSound(!soundOn()); showSound(); });
+  showSound();
+  // Review item [228]: space does what Climb does; arrows are the keyboard backup for dragging
+  window.addEventListener('keydown', (e) => {
+    if (e.target instanceof HTMLInputElement) return;
+    if (e.code === 'Space') {
+      e.preventDefault();
+      if (!(e.target instanceof HTMLButtonElement) || e.target.id === 'climb') void climb();
+    } else if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') {
+      e.preventDefault();
+      moveWindow(state.from + (e.code === 'ArrowRight' ? 1 : -1));
+    }
+  });
+  // The scene frames the ridge above the deck, whatever size the deck wraps to
+  const deck = $('deck');
+  const inset = () => {
+    const r = deck.getBoundingClientRect();
+    scene.setInsets(0, window.innerHeight - r.top + 6);
+  };
+  new ResizeObserver(inset).observe(deck);
+  window.addEventListener('resize', inset);
+  inset();
 }
 
 // ---------- a round ----------
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-const callout = (text: string) => ($('callout').textContent = text);
-
-/** Stage a round's moves one by one, then its result. */
-async function stage(plan: ClimbPlan, pace = 700) {
-  state.plan = plan;
-  state.step = 0;
-  state.blooms = [];
-  callout('Ueli sets off from base camp');
-  drawRidge();
-  for (const move of plan.moves) {
-    await sleep(pace);
-    state.step = move.to;
-    if (move.bloom) state.blooms.push(move.bloom);
-    callout(move.label);
-    drawRidge();
-  }
-  await sleep(pace);
-  state.step = plan.step;
-  drawRidge();
-  const mult = plan.multiplier > 1 ? ` (×${plan.multiplier} edelweiss)` : '';
-  callout(plan.inWindow ? `He stopped in the window! Won ${plan.win}×${mult}` : plan.step > TOP ? 'Over the edge: not this time' : `Step ${plan.step}: not this time`);
-}
-
 async function climb() {
-  if (state.phase !== 'idle') return;
+  if (state.phase !== 'idle' || !state.ready) return;
+  unlockSound();
   showError('');
   state.phase = 'climbing';
   syncControls();
@@ -226,7 +207,7 @@ async function climb() {
     const { balance, round } = await rgs.play(Math.round(state.bet * MICRO), mode);
     state.balance = balance.amount / MICRO;
     syncControls();
-    await stage(planRound(bookOf(round)));
+    state.plan = await stageRound(bookOf(round), scene, { format: money, bet: state.bet, social, instant: state.instant, announce });
     if (round.active) state.balance = (await rgs.endRound()).balance.amount / MICRO;
     state.history.unshift({ mode, win: round.payout / MICRO });
   } catch (e) {
@@ -254,7 +235,6 @@ const showError = (text: string) => ($('error').textContent = text);
 // ---------- start ----------
 async function start() {
   applyWording();
-  buildRidge();
   wireControls();
   syncControls();
   if (launch.replay) return replay();
@@ -268,9 +248,9 @@ async function start() {
     state.bet = auth.config.defaultBetLevel / MICRO;
     state.ready = true;
     syncControls();
-    // (a round left open by a refresh: show where it ended and pay it)
+    // (a round left open by a refresh: show where it ended and settle it)
     if (auth.round?.active) {
-      await stage(planRound(bookOf(auth.round)), 0);
+      state.plan = await stageRound(bookOf(auth.round), scene, { format: money, bet: state.bet, social, instant: true, announce });
       state.balance = (await rgs.endRound()).balance.amount / MICRO;
       syncControls();
     }
@@ -292,7 +272,9 @@ async function replay() {
       if (mode.window !== 'edge') state.from = mode.window[0];
     }
     syncControls();
-    await stage(planRound({ id: Number(r.event), payoutMultiplier: Math.round(recorded.payoutMultiplier * 100), events: recorded.state }));
+    unlockSound();
+    const book = { id: Number(r.event), payoutMultiplier: Math.round(recorded.payoutMultiplier * 100), events: recorded.state };
+    state.plan = await stageRound(book, scene, { format: money, bet: r.amount ? r.amount / MICRO : 1, social, announce });
   } catch (e) {
     showError(describe(e));
   }

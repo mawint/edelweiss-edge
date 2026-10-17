@@ -1,60 +1,95 @@
-/* Placeholder look: plain shapes until the art style is chosen. */
+/* Alpine-cartoon look: chunky ink outlines, cream panels, gold and red. The canvas fills the screen and
+   the deck sits over its bottom edge; the scene frames the ridge above the deck (Scene.setInsets). */
+@import '@fontsource/luckiest-guy/latin-400.css';
+@import '@fontsource/baloo-2/latin-500.css';
+@import '@fontsource/baloo-2/latin-700.css';
+@import '@fontsource/baloo-2/latin-800.css';
+
 :root {
-  --sky: #1d3557;
-  --snow: #f1faee;
-  --rock: #6c7a89;
-  --window: #2a9d8f;
-  --edge: #c1121f;
-  --bloom: #ffffff;
-  --golden: #f4d35e;
-  --ink: #0b1320;
-  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
-  color: var(--snow);
-  background: linear-gradient(var(--sky), #457b9d);
+  --night: #0f2236;
+  --cream: #fff4df;
+  --ink: #24152e;
+  --gold: #ffc93c;
+  --red: #e2383f;
+  --muted: #6b5a72;
+  --display: 'Luckiest Guy', 'Arial Black', Impact, sans-serif;
+  --ui: 'Baloo 2', 'Trebuchet MS', sans-serif;
+  font-family: var(--ui);
+  color: var(--ink);
 }
 * { box-sizing: border-box; }
-html, body { margin: 0; min-height: 100%; }
-body { min-height: 100vh; }
-#app { max-width: 960px; margin: 0 auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+/* Review item [227]: the frame never scrolls */
+html, body { margin: 0; height: 100%; overflow: hidden; background: var(--night); }
+#app { position: fixed; inset: 0; }
+#scene { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
 
-.top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; }
-.top h1 { margin: 0; font-size: 1.8rem; letter-spacing: 0.02em; }
-.tag { margin: 0; opacity: 0.7; font-size: 0.85rem; flex: 1; }
-.balance small { opacity: 0.7; }
-
-/* the ridge: 26 steps rising left to right, then the edge */
-.ridge-wrap { background: rgba(11, 19, 32, 0.25); border-radius: 12px; padding: 12px 8px 8px; }
-.ridge { position: relative; display: grid; grid-template-columns: repeat(27, 1fr); align-items: end; gap: 2px; height: 220px; }
-.step { position: relative; height: var(--h, 100%); background: var(--rock); border-radius: 3px 3px 0 0; display: flex; align-items: flex-end; justify-content: center; }
-.step .n { font-size: 0.6rem; color: var(--snow); padding-bottom: 2px; }
-.step.edge { height: 100%; background: repeating-linear-gradient(-45deg, var(--edge) 0 6px, transparent 6px 12px); }
-.step.in-window { background: var(--window); box-shadow: 0 0 0 2px var(--snow) inset; }
-.step.edge.in-window { box-shadow: 0 0 0 2px var(--golden) inset; }
-.step.bloom::before, .step.golden::before { content: '✿'; position: absolute; top: -1.2em; font-size: 1rem; color: var(--bloom); }
-.step.golden::before { color: var(--golden); }
-#ueli {
-  position: absolute; bottom: 0; left: calc((var(--at, 0) + 0.5) * 100% / 27); translate: -50% -4px;
-  width: 22px; height: 22px; border-radius: 50%; background: var(--golden); color: var(--ink);
-  display: grid; place-items: center; font-weight: 700; font-size: 0.8rem; transition: left 0.4s ease;
+.deck {
+  position: absolute; left: 50%; bottom: max(10px, env(safe-area-inset-bottom)); translate: -50% 0;
+  width: min(1240px, calc(100% - 20px));
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px 10px;
+  background: var(--cream); border: 4px solid var(--ink); border-radius: 18px; box-shadow: 0 6px 0 var(--ink);
+  padding: 8px 12px;
 }
-#ueli.over { background: var(--edge); color: var(--snow); }
-.callout { min-height: 1.5em; margin-top: 8px; text-align: center; font-weight: 600; }
-
-.controls { display: flex; flex-direction: column; gap: 12px; }
-.difficulty { display: flex; flex-wrap: wrap; gap: 6px; }
+.grp { display: flex; align-items: center; gap: 6px; }
 button {
-  font: inherit; font-weight: 600; color: var(--ink); background: var(--snow); border: 0; border-radius: 8px;
-  padding: 10px 14px; min-height: 44px; cursor: pointer;
+  font: inherit; font-weight: 700; color: var(--ink); background: #fff; border: 3px solid var(--ink); border-radius: 12px;
+  box-shadow: 0 3px 0 var(--ink); padding: 4px 10px; min-height: 40px; cursor: pointer; line-height: 1.05;
 }
-button[aria-pressed='true'] { background: var(--window); color: var(--snow); }
+button:active:not(:disabled) { translate: 0 2px; box-shadow: 0 1px 0 var(--ink); }
 button:disabled { opacity: 0.5; cursor: default; }
-.slider { display: flex; align-items: center; gap: 12px; }
-.slider[hidden] { display: none; }
-.slider input { flex: 1; min-width: 0; }
-.slider output { min-width: 7em; text-align: right; }
-.pays { margin: 0; opacity: 0.9; }
-.row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
-.bet { display: flex; align-items: center; gap: 10px; }
-.bet small { opacity: 0.7; }
-.climb { font-size: 1.2rem; padding: 12px 36px; background: var(--golden); }
-.error { margin: 0; min-height: 1.2em; color: #ffd6d6; }
+button:focus-visible { outline: 3px solid var(--red); outline-offset: 2px; }
+button small, .where small, .odds small, .balance small { display: block; font-weight: 500; font-size: 11px; color: var(--muted); }
+
+.diffs button { display: grid; text-align: left; font-size: 14px; }
+.diffs button[aria-pressed='true'] { background: var(--gold); }
+.diffs button.edge[aria-pressed='true'] { background: var(--red); color: #fff; }
+.diffs button.edge[aria-pressed='true'] small { color: #ffe1e1; }
+
+.stepper button, .bet button { width: 40px; padding: 0; font-size: 18px; }
+.where { display: grid; text-align: center; min-width: 8.5em; }
+.where b { font-size: 15px; }
+.bet .where { min-width: 4.5em; }
+.stepper[hidden] { display: none; }
+
+.odds { display: grid; text-align: center; gap: 0; min-width: 5em; }
+.pays { font-family: var(--display); font-size: 28px; line-height: 1; color: var(--red); }
+
+.climb {
+  font-family: var(--display); font-weight: 400; font-size: 30px; padding: 8px 22px 4px; background: var(--gold);
+  border-width: 4px; border-radius: 16px; box-shadow: 0 5px 0 var(--ink);
+}
+.meta { display: grid; gap: 4px; justify-items: center; }
+.balance { font-variant-numeric: tabular-nums; text-align: center; }
+.balance b { font-size: 15px; }
+.sound { min-height: 28px; font-size: 12px; padding: 2px 8px; box-shadow: none; border-width: 2px; }
+.error { flex-basis: 100%; margin: 0; text-align: center; color: var(--red); font-weight: 700; }
+.error:empty { display: none; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* Short screens (the 400×225 popout): one tight row, labels dropped */
+@media (max-height: 300px) {
+  .deck { padding: 4px 6px; gap: 4px; border-width: 3px; border-radius: 12px; bottom: 4px; box-shadow: 0 3px 0 var(--ink); }
+  button { min-height: 28px; padding: 2px 6px; font-size: 11px; border-width: 2px; box-shadow: 0 2px 0 var(--ink); border-radius: 8px; }
+  button small, .where small, .odds small, .balance small, .sound { display: none; }
+  .diffs button { font-size: 11px; }
+  .where { min-width: 5.5em; }
+  .where b, .balance b { font-size: 11px; }
+  .stepper button, .bet button { width: 26px; font-size: 12px; }
+  .pays { font-size: 16px; }
+  .climb { font-size: 16px; padding: 4px 10px 2px; border-width: 2px; box-shadow: 0 2px 0 var(--ink); }
+}
+/* Phones in portrait: the deck stacks in rows under the mountain */
+@media (max-width: 560px) {
+  .deck { gap: 6px; }
+  .diffs { width: 100%; justify-content: center; }
+  .diffs button { font-size: 12px; padding: 4px 6px; }
+  .climb { order: 5; width: 100%; }
+}
+/* Short beats narrow: the popout is both, and the mountain needs the room more than the labels do */
+@media (max-height: 300px) {
+  .diffs { width: 100%; }
+  .climb { order: 0; width: auto; }
+  .balance { display: none; }
+  .where, .bet .where, .odds { min-width: 0; }
+  .grp { gap: 3px; }
+}
