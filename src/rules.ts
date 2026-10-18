@@ -45,7 +45,7 @@ export function rulesHtml(social: boolean): string {
 <p>Every mode costs 1× the ${w('bet', 'play amount')}. <b>Over the Edge</b> wins only if he really falls. If Barry the St. Bernard pulls him back, he ends on step ${r.top}.</p>
 
 <h3>The climb</h3>
-<p>Where Ueli stops is decided when the round starts. The climb then shows how he gets there: three climbs of 0 to ${r.maxClimb} steps (he stops to yodel on at most one of them). Before each climb the big cowbell's counter spins and stops on how many steps he takes (the dots on its strap show which climb it is), then counts down as he walks, one step for every ring; 0 means he stops to yodel. Sometimes:</p>
+<p>Where Ueli stops is decided when the round starts. The climb then shows how he gets there: three climbs of 0 to ${r.maxClimb} steps (he stops to yodel on at most one of them). Before each climb a number rolls and stops on how many steps he takes (the little mountains under it show which climb it is), then counts down as he walks; 0 means he stops to yodel. Sometimes:</p>
 <ul>
 <li><b>Gondola:</b> carries him up a few steps.</li>
 <li><b>Avalanche:</b> knocks him back down, sometimes all the way to base camp.</li>

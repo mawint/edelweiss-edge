@@ -1047,8 +1047,7 @@ export class Scene {
   async spinCounter(climb: number | 'echo', steps: number) {
     const r = { climb, pos: 0, target: steps, remaining: null as number | null, alpha: 1, drop: 0, dock: 0, swing: 0, note: '' };
     this.reel = r;
-    play('whoosh');
-    await this.tween(this.reduce ? 1 : 320, (p) => { r.drop = p; }, backOut);
+    await this.tween(this.reduce ? 1 : 260, (p) => { r.drop = p; }, backOut);
     if (this.reduce) { r.pos = steps; } else {
       const loops = this.speed > 1 ? 10 : 20, dist = loops + steps;
       let last = -1;
@@ -1059,7 +1058,7 @@ export class Scene {
       });
       r.pos = dist;
     }
-    play('clunk'); play('bell', 0.8);
+    // (the reel's ticks are the counter's only sound)
     r.swing = this.reduce ? 0 : 1;
     r.remaining = steps;
     r.note = steps === 0 ? 'Yodel break!' : steps === 1 ? 'step to go' : 'steps to go';
@@ -1080,81 +1079,62 @@ export class Scene {
     const r = this.reel;
     if (!r?.remaining) return;
     r.remaining--;
-    r.swing = Math.max(r.swing, this.reduce ? 0 : 0.45);
+    r.swing = this.reduce ? 0 : 1;
     if (r.remaining === 0) r.note = 'here we go…';
     else r.note = r.remaining === 1 ? 'step to go' : 'steps to go';
   }
 
+  /**
+   * The step counter: just the number, rolling in place, and three little mountains under it for the three
+   * climbs (gold once reached, grey still to come; ECHO for the echo). Centre stage while it spins, then
+   * tucked into the top-left corner at half size while it counts down.
+   */
   private drawCounter() {
     const r = this.reel;
     if (!r || r.drop <= 0) return;
-    const c = this.ctx, t = this.clock;
-    r.swing *= 0.985;
-    // (hung just under the altitude bar, so the strap doesn't cover it)
-    const hang = this.inset.top + 68;
-    // Centre stage while it spins; docked small in the top-left corner once the number is known
-    const cx = lerp(this.W / 2, 70, r.dock), cy = lerp(hang, this.inset.top + 66, r.dock), sc = lerp(1, 0.5, r.dock);
-    const y0 = cy - 230 * (1 - r.drop) * (1 - r.dock);
-    const angle = r.swing * Math.sin(t / 110) * 0.22;
+    const c = this.ctx;
+    r.swing *= 0.9;
+    const pulse = 1 + r.swing * 0.08;
+    const cx = lerp(this.W / 2, 64, r.dock), cy = lerp(this.inset.top + 62, this.inset.top + 58, r.dock), sc = lerp(1, 0.55, r.dock) * pulse;
     c.save();
-    // (a docked bell fades out rather than rising back up)
-    c.globalAlpha = r.dock > 0.5 ? r.drop : 1;
-    c.translate(cx, y0); c.scale(sc, sc);
-    c.save(); c.rotate(angle);
-    // Strap: red with white stitching, and the climb pips (or ECHO) on a little plaque
-    this.rrect(-13, -20, 26, 58, 6); this.fillInk(C.red, 4);
-    c.setLineDash([5, 5]); c.beginPath(); c.moveTo(-6, -16); c.lineTo(-6, 34); c.moveTo(6, -16); c.lineTo(6, 34); c.lineWidth = 2; c.strokeStyle = '#fff'; c.stroke(); c.setLineDash([]);
-    this.rrect(-48, 4, 96, 26, 13); this.fillInk(C.cream, 3.5);
-    if (r.climb === 'echo') this.text('ECHO', 0, 18, `18px ${FD}`, C.red, 0);
-    else for (let i = 1; i <= 3; i++) {
-      const px = (i - 2) * 26;
-      this.ellipse(px, 17, i === r.climb ? 8 : 6.5, i === r.climb ? 8 : 6.5);
-      this.fillInk(i < r.climb ? C.gold : i === r.climb ? C.red : '#fff', 3);
-    }
-    // The bell: flared gold body, shaded on one side, a highlight on the other
-    const body = () => {
-      c.beginPath(); c.moveTo(-34, 40); c.quadraticCurveTo(0, 30, 34, 40);
-      c.bezierCurveTo(44, 90, 50, 130, 70, 150); c.lineTo(-70, 150); c.bezierCurveTo(-50, 130, -44, 90, -34, 40); c.closePath();
-    };
-    body(); c.fillStyle = C.gold; c.fill();
-    c.save(); body(); c.clip(); c.fillStyle = '#E3A928'; c.fillRect(22, 30, 60, 130); c.restore();
-    body(); this.ink(5);
-    c.beginPath(); c.moveTo(-24, 52); c.quadraticCurveTo(-34, 100, -50, 136); c.lineWidth = 5; c.strokeStyle = 'rgba(255,255,255,.55)'; c.stroke();
-    this.ellipse(0, 150, 72, 12); this.fillInk('#D99A1E', 4);
-    // Clapper, swinging a little behind the bell's own swing
-    const clap = Math.sin(t / 110 - 0.8) * r.swing * 10;
-    this.ellipse(clap, 166, 11, 11); this.fillInk('#8E5A2C', 3.5);
-    // The reel window: neighbouring digits scroll past, shaded top and bottom like a drum
-    const wx = -36, wy = 62, ww = 72, wh = 74;
-    this.rrect(wx, wy, ww, wh, 14); this.fillInk(C.cream, 4);
-    c.save(); c.beginPath(); c.roundRect(wx + 3, wy + 3, ww - 6, wh - 6, 11); c.clip();
+    c.globalAlpha = r.dock > 0.5 ? r.drop : Math.min(1, r.drop * 1.5);
+    c.translate(cx, cy - 40 * (1 - r.drop) * (1 - r.dock)); c.scale(sc, sc);
+    const h = 148;
+    // Just the number, rolling in place: digits scroll up through an invisible slot and fade at its edges
+    const wy = 6, wh = 104, mid = wy + wh / 2 + 6, base0 = c.globalAlpha;
+    c.save(); c.beginPath(); c.rect(-70, wy, 140, wh); c.clip();
     const pos = r.remaining ?? r.pos;
     const base = Math.floor(pos), frac = r.remaining === null ? pos - base : 0;
     for (let k = -1; k <= 2; k++) {
       const digit = (((base + k) % 10) + 10) % 10;
-      const y = wy + wh / 2 + 4 + (k - frac) * 58;
-      c.globalAlpha = k === 0 && frac < 0.5 ? 1 : k === 1 && frac >= 0.5 ? 1 : 0.35;
-      this.text(String(digit), 0, y, `56px ${FD}`, r.remaining === 0 && k === 0 ? C.red : C.ink, 0);
+      const off = (k - frac) * 84;
+      c.globalAlpha = base0 * Math.max(0, 1 - Math.abs(off) / 70);
+      this.text(String(digit), 0, mid + off, `88px ${FD}`, r.remaining === 0 && k === 0 ? C.red : C.gold, 12);
     }
-    c.globalAlpha = 1;
-    const shade = c.createLinearGradient(0, wy, 0, wy + wh);
-    shade.addColorStop(0, 'rgba(36,21,46,.45)'); shade.addColorStop(0.3, 'rgba(36,21,46,0)'); shade.addColorStop(0.7, 'rgba(36,21,46,0)'); shade.addColorStop(1, 'rgba(36,21,46,.45)');
-    c.fillStyle = shade; c.fillRect(wx, wy, ww, wh);
     c.restore();
-    this.rrect(wx, wy, ww, wh, 14); this.ink(4);
-    // A red pointer on each side of the window marks the line the reel stops on
-    for (const sx of [-1, 1]) { c.beginPath(); c.moveTo(sx * 46, wy + wh / 2 - 7); c.lineTo(sx * 38, wy + wh / 2); c.lineTo(sx * 46, wy + wh / 2 + 7); c.closePath(); this.fillInk(C.red, 2.5); }
-    c.restore();
-    // The label hangs still under the bell (larger type once docked, so it stays readable at half size)
-    if (r.note && r.drop > 0.9) {
-      const size = lerp(17, 26, r.dock);
+    c.globalAlpha = base0;
+    // Which climb: three little mountains, the current one in gold
+    if (r.climb === 'echo') this.text('ECHO', 0, wy + wh + 21, `22px ${FD}`, C.red, 0);
+    else for (let i = 1; i <= 3; i++) this.climbIcon((i - 2) * 34, wy + wh + 30, i <= r.climb);
+    // The label sits under the panel once the number is known
+    if (r.note && r.remaining !== null) {
+      const size = lerp(17, 24, r.dock);
       c.font = `800 ${size}px ${FU}`;
-      const w = c.measureText(r.note).width + size * 1.5, h = size * 1.75, ly = 196 + r.dock * 8;
-      this.rrect(-w / 2, ly - h / 2, w, h, h / 2); this.fillInk(C.ink, 0);
+      const lw = c.measureText(r.note).width + size * 1.4, lh = size * 1.75, ly = h + 8 + lh / 2;
+      this.rrect(-lw / 2, ly - lh / 2, lw, lh, lh / 2); this.fillInk(C.ink, 0);
       this.text(r.note, 0, ly + 1, `800 ${size}px ${FU}`, C.cream, 0);
     }
     c.restore();
   }
+  /** A little mountain for one of the three climbs: gold once reached (done or current), grey still to come. */
+  private climbIcon(x: number, base: number, current: boolean) {
+    const c = this.ctx;
+    c.beginPath(); c.moveTo(x - 14, base); c.lineTo(x, base - 22); c.lineTo(x + 14, base); c.closePath();
+    this.fillInk(current ? C.gold : '#CFC6D8', current ? 3 : 2.5);
+    c.beginPath(); c.moveTo(x - 5, base - 13); c.lineTo(x, base - 22); c.lineTo(x + 5, base - 13); c.quadraticCurveTo(x, base - 10, x - 5, base - 13);
+    c.fillStyle = current ? '#fff' : '#ECE8F0'; c.fill();
+  }
+
 
 
   async yodel() {
