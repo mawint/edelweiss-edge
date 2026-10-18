@@ -14,7 +14,8 @@ Last updated October 17, 2026.
   - `src/scene.ts`: the canvas mountain, Ueli, follow-cam, weather, goats, and every feature's moment (gondola, avalanche, echo, föhn, fall, Barry's rescue), hidden blooms bursting as he reaches them, the win stamp.
   - `src/director.ts`: stages a book event by event; cosmetic choices are seeded from the book id.
   - `src/sound.ts`: synthesized sound, one mute (review [107]).
-  - The deck is one short row: Menu, Difficulty (a picker showing each width and pay range), bet −/+, balance, Climb (space bar, review [228]).
+  - The deck is one short row: Menu, Difficulty (a picker showing each width and pay range), bet −/+, balance, and Climb (space bar, review [228]) with Turbo (») on its left and Autoplay (↻) on its right. Autoplay opens a panel first (10/25/50/100 climbs, stop after any win or a 20× win; review [104]); while it runs Climb becomes Stop.
+  - Life on the mountain: a paraglider, an eagle, birds, a hot-air balloon, a rescue helicopter and a banner plane drift through the sky; boulders, cracks, pines, flowers, crystals, snow drifts, a cave with blinking eyes and a waterfall break up the rock face (bigger and sparser on phones).
   - What the window pays and how often it wins sits on a sign above it on the mountain. Drag the sign (or anywhere on the mountain) to move the window, or tap its ◀ ▶ arrows; the arrow keys work too.
   - The menu: sound and turbo toggles and the rules (`src/rules.ts`, built from the exported numbers): pays per difficulty, RTP and max win per mode, the features, edelweiss, every control, and the disclaimer (review [25], [27], [235], [185], [107]). `src/wording.test.ts` renders the social version to check it.
   - No scrolling at any size (review [227]); checked at 1280×720, 430×932 and 400×225. Portrait phones get a steeper ridge.
@@ -24,7 +25,7 @@ Last updated October 17, 2026.
 ## Next
 1. Settle the open questions in `docs/GAME_DESIGN.md`, the mode count first.
 2. Run the math's `run.py` (optimizer) and check `stats.py`. Then export fixtures from the published books, so every kind of round (rescue, golden bloom) is covered.
-3. Autoplay (with a confirmation step, review [104]) and replay polish. Then run `engine-review-prompt.md`.
+3. Replay polish. Then run `engine-review-prompt.md`.
 
 ## Open questions
 See `docs/GAME_DESIGN.md`, Open questions.

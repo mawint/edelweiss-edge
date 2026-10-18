@@ -20,7 +20,11 @@
           <button type="button" id="bet-up" aria-label="Raise the bet" data-social-label="Raise the play amount">+</button>
         </div>
         <div class="val balance"><small>Balance</small><b id="balance">…</b></div>
-        <button type="button" class="climb" id="climb">Climb!</button>
+        <div class="go">
+          <button type="button" class="icon side" id="turbo" aria-pressed="false" aria-label="Turbo: play the climb twice as fast" title="Turbo">»<small>Turbo</small></button>
+          <button type="button" class="climb" id="climb">Climb!</button>
+          <button type="button" class="icon side" id="auto-open" aria-haspopup="dialog" aria-label="Autoplay" title="Autoplay">↻<small>Auto</small></button>
+        </div>
         <p class="error" id="error" role="alert"></p>
       </section>
 
@@ -34,9 +38,24 @@
         <header><h2 id="menu-title">Menu</h2><button type="button" class="icon close" aria-label="Close">✕</button></header>
         <div class="toggles">
           <button type="button" class="toggle" id="sound" aria-pressed="true">Sound <b>On</b></button>
-          <button type="button" class="toggle" id="turbo" aria-pressed="false">Turbo <b>Off</b></button>
         </div>
         <article class="rules" id="rules"></article>
+      </dialog>
+
+      <dialog class="sheet" id="auto-sheet" aria-labelledby="auto-title">
+        <header><h2 id="auto-title">Autoplay</h2><button type="button" class="icon close" aria-label="Close">✕</button></header>
+        <p class="lead" data-social="Ueli climbs again and again with your difficulty, window and play amount. You can stop any time.">Ueli climbs again and again with your difficulty, window and bet. You can stop any time.</p>
+        <div class="rounds" id="auto-rounds" role="radiogroup" aria-label="Number of climbs">
+          <button type="button" data-rounds="10">10</button>
+          <button type="button" data-rounds="25" aria-pressed="true">25</button>
+          <button type="button" data-rounds="50">50</button>
+          <button type="button" data-rounds="100">100</button>
+        </div>
+        <div class="checks">
+          <label><input type="checkbox" id="auto-stop-win" /> Stop after any win</label>
+          <label><input type="checkbox" id="auto-stop-big" checked /> Stop after a win of 20× or more</label>
+        </div>
+        <button type="button" class="climb start" id="auto-start">Start 25 climbs</button>
       </dialog>
 
       <p class="sr-only" id="callout" aria-live="polite"></p>

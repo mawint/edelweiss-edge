@@ -63,13 +63,14 @@ export function rulesHtml(social: boolean): string {
 
 <h3>Controls</h3>
 <ul>
-<li><b>Menu (☰):</b> these rules, sound and turbo.</li>
+<li><b>Menu (☰):</b> these rules and sound.</li>
 <li><b>Difficulty:</b> choose Easy, Medium, Hard, Pinpoint or Over the Edge.</li>
 <li><b>The sign over your window:</b> drag it (or anywhere on the mountain) to move the window; tap its ◀ ▶ arrows to move it one step. The arrow keys do the same.</li>
 <li><b>− / +:</b> ${w('lower or raise the bet', 'lower or raise the play amount')}.</li>
 <li><b>Climb!</b> (or the space bar): ${w('places the bet and starts the climb', 'starts the climb')}.</li>
-<li><b>Sound:</b> turns all sound on or off.</li>
-<li><b>Turbo:</b> plays the climb twice as fast.</li>
+<li><b>Turbo (»):</b> plays the climb twice as fast. Tap again to turn it off.</li>
+<li><b>Autoplay (↻):</b> opens a panel to choose how many climbs (10, 25, 50 or 100) and when to stop early (after any win, or after a win of 20× or more); nothing starts until you press Start. While it runs, Climb becomes <b>Stop</b> and shows the climbs left; Stop or the space bar ends it. It also stops when your balance is too low.</li>
+<li><b>Sound (in the menu):</b> turns all sound on or off.</li>
 <li><b>Close (✕):</b> closes a menu.</li>
 </ul>
 

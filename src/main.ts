@@ -131,8 +131,14 @@ function syncControls() {
   $('diff-label').textContent = NAMES[state.difficulty];
   $('bet').textContent = money(state.bet);
   $('balance').textContent = money(state.balance);
-  const busy = state.phase !== 'idle' || !state.ready;
-  for (const b of document.querySelectorAll<HTMLButtonElement>('.deck button')) b.disabled = busy && b.id !== 'menu-open';
+  const autoplaying = auto.left > 0;
+  const busy = state.phase !== 'idle' || !state.ready || autoplaying;
+  // (menu and turbo stay live mid-round; during autoplay Climb becomes Stop)
+  for (const b of document.querySelectorAll<HTMLButtonElement>('.deck button')) b.disabled = busy && !['menu-open', 'turbo'].includes(b.id);
+  const climbBtn = $<HTMLButtonElement>('climb');
+  climbBtn.classList.toggle('stop', autoplaying);
+  climbBtn.textContent = autoplaying ? `Stop · ${auto.left}` : 'Climb!';
+  climbBtn.disabled = autoplaying ? false : busy;
   scene.dragEnabled = !busy && state.difficulty !== 'edge';
 }
 
@@ -150,11 +156,47 @@ function renderDifficulties() {
 }
 
 const anySheetOpen = () => !!document.querySelector('dialog[open]');
+
+// ---------- autoplay (review item [104]: it only starts from the panel's confirm button) ----------
+const auto = { left: 0, rounds: 25, stopOnWin: false, stopOnBig: true };
+/** A single win this many times the bet stops autoplay when that box is ticked. */
+const BIG_WIN = 20;
+
+async function runAutoplay() {
+  auto.left = auto.rounds;
+  syncControls();
+  try {
+    while (auto.left > 0) {
+      if (state.balance < state.bet) { showError(say('Autoplay stopped: your balance is too low for this bet.', 'Autoplay stopped: your balance is too low for this play.')); break; }
+      // (a menu opened mid-autoplay pauses it rather than stopping it)
+      while (anySheetOpen() && auto.left > 0) await new Promise((r) => setTimeout(r, 200));
+      if (auto.left === 0) break;
+      auto.left--;
+      syncControls();
+      const plan = await climb();
+      if (!plan) break;
+      if ((auto.stopOnWin && plan.win > 0) || (auto.stopOnBig && plan.win >= BIG_WIN)) break;
+      await new Promise((r) => setTimeout(r, scene.speed > 1 ? 250 : 600));
+    }
+  } finally {
+    auto.left = 0;
+    syncControls();
+  }
+}
+const stopAutoplay = () => { auto.left = 0; syncControls(); };
 function openSheet(id: string) {
   const d = $<HTMLDialogElement>(id);
   if (id === 'diff-sheet') renderDifficulties();
   if (id === 'menu-sheet') $('rules').innerHTML = rulesHtml(social);
+  if (id === 'auto-sheet') syncAutoSheet();
   d.showModal();
+}
+
+function syncAutoSheet() {
+  for (const b of document.querySelectorAll<HTMLButtonElement>('[data-rounds]')) b.setAttribute('aria-pressed', String(Number(b.dataset.rounds) === auto.rounds));
+  $<HTMLInputElement>('auto-stop-win').checked = auto.stopOnWin;
+  $<HTMLInputElement>('auto-stop-big').checked = auto.stopOnBig;
+  $('auto-start').textContent = `Start ${auto.rounds} climbs`;
 }
 
 const TURBO_KEY = 'edelweiss.turbo';
@@ -198,14 +240,28 @@ function wireControls() {
   };
   $('bet-down').addEventListener('click', () => stepBet(-1));
   $('bet-up').addEventListener('click', () => stepBet(1));
-  $('climb').addEventListener('click', () => void climb());
+  $('climb').addEventListener('click', () => (auto.left > 0 ? stopAutoplay() : void climb()));
+  $('auto-open').addEventListener('click', () => openSheet('auto-sheet'));
+  $('auto-rounds').addEventListener('click', (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-rounds]');
+    if (!b) return;
+    auto.rounds = Number(b.dataset.rounds);
+    syncAutoSheet();
+  });
+  $<HTMLInputElement>('auto-stop-win').addEventListener('change', (e) => { auto.stopOnWin = (e.target as HTMLInputElement).checked; });
+  $<HTMLInputElement>('auto-stop-big').addEventListener('change', (e) => { auto.stopOnBig = (e.target as HTMLInputElement).checked; });
+  $('auto-start').addEventListener('click', () => {
+    $<HTMLDialogElement>('auto-sheet').close();
+    unlockSound();
+    void runAutoplay();
+  });
 
   const sound = $<HTMLButtonElement>('sound');
   const showSound = () => { sound.setAttribute('aria-pressed', String(soundOn())); sound.querySelector('b')!.textContent = soundOn() ? 'On' : 'Off'; };
   sound.addEventListener('click', () => { setSound(!soundOn()); showSound(); });
   showSound();
   const turbo = $<HTMLButtonElement>('turbo');
-  const showTurbo = () => { const on = scene.speed > 1; turbo.setAttribute('aria-pressed', String(on)); turbo.querySelector('b')!.textContent = on ? 'On' : 'Off'; };
+  const showTurbo = () => turbo.setAttribute('aria-pressed', String(scene.speed > 1));
   scene.speed = readTurbo() ? 2 : 1;
   turbo.addEventListener('click', () => {
     scene.speed = scene.speed > 1 ? 1 : 2;
@@ -223,7 +279,8 @@ function wireControls() {
     if (anySheetOpen()) return;
     if (e.code === 'Space') {
       e.preventDefault();
-      if (!(e.target instanceof HTMLButtonElement) || e.target.id === 'climb') void climb();
+      if (auto.left > 0) stopAutoplay();
+      else if (!(e.target instanceof HTMLButtonElement) || e.target.id === 'climb') void climb();
     } else if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') {
       e.preventDefault();
       moveWindow(state.from + (e.code === 'ArrowRight' ? 1 : -1));
@@ -238,8 +295,9 @@ function wireControls() {
 }
 
 // ---------- a round ----------
-async function climb() {
-  if (state.phase !== 'idle' || !state.ready || anySheetOpen()) return;
+/** One round. Returns what it staged, or null if it couldn't be played. */
+async function climb(): Promise<ClimbPlan | null> {
+  if (state.phase !== 'idle' || !state.ready || anySheetOpen()) return null;
   unlockSound();
   showError('');
   state.phase = 'climbing';
@@ -252,8 +310,10 @@ async function climb() {
     state.plan = await stageRound(bookOf(round), scene, { format: money, bet: state.bet, social, instant: state.instant, announce });
     if (round.active) state.balance = (await rgs.endRound()).balance.amount / MICRO;
     state.history.unshift({ mode, win: round.payout / MICRO });
+    return state.plan;
   } catch (e) {
     showError(describe(e));
+    return null;
   } finally {
     state.phase = 'idle';
     syncControls();

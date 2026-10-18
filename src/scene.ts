@@ -60,6 +60,24 @@ interface Ball { x0: number; r: number; x: number; y: number; rot: number }
 interface Dog { x: number; y: number; dir: number; running: boolean }
 interface Ring { x: number; y: number; r: number; a: number; k: number }
 interface Task { t: number; ms: number; fn: (p: number) => void; ease: (p: number) => number; res: () => void }
+type FlyerKind = 'paraglider' | 'eagle' | 'birds' | 'balloon' | 'helicopter' | 'plane';
+interface Flyer { kind: FlyerKind; x: number; y: number; vx: number; vy: number; s: number; t: number; hue: number }
+
+/** What lives on the rock face under each step, fixed per step so it doesn't flicker. */
+type FaceKind = 'boulder' | 'crack' | 'pine' | 'flowers' | 'cave' | 'crystal' | 'drift';
+const FACE: { kind: FaceKind; dx: number; depth: number; size: number }[][] = Array.from({ length: TOP + 1 }, (_, i) => {
+  const pick = (k: number): FaceKind => {
+    const h = hash(i * 31 + k * 7);
+    if (i <= 9) return h < 0.3 ? 'pine' : h < 0.5 ? 'flowers' : h < 0.75 ? 'boulder' : 'crack';
+    if (i <= 19) return h < 0.35 ? 'boulder' : h < 0.65 ? 'crack' : h < 0.8 ? 'pine' : 'crystal';
+    return h < 0.4 ? 'crystal' : h < 0.7 ? 'drift' : 'crack';
+  };
+  const items = [{ kind: pick(1), dx: 0.2 + hash(i + 300) * 0.6, depth: 0.9 + hash(i + 400) * 1.2, size: 0.8 + hash(i + 500) * 0.5 }];
+  if (hash(i + 600) > 0.45) items.push({ kind: pick(2), dx: 0.15 + hash(i + 700) * 0.7, depth: 2.4 + hash(i + 800) * 1.8, size: 0.7 + hash(i + 900) * 0.5 });
+  return items;
+});
+/** A cave (with something blinking inside) and a waterfall, at fixed places on the face. */
+const CAVE_STEP = 13, FALL_STEP = 7;
 
 const freshUeli = (): Ueli => ({ x: stand(0).x, y: 0, step: 0, rot: 0, sq: 0, lean: 0, ring: 0, swing: 0, face: 'happy', horn: 0, walk: 0, dir: 1, pose: 'idle' });
 
@@ -107,6 +125,8 @@ export class Scene {
   private windDir = 1;
   private marmot: { x: number; y: number; up: number } | null = null;
   private win: { text: string; sub: string; amount: number; shown: number; format: (v: number) => string } | null = null;
+  private flyers: Flyer[] = [];
+  private nextFlyer = 1500;
 
   /** Dragging the window on the mountain: called with the step under the pointer. */
   onDrag: ((step: number) => void) | null = null;
@@ -269,6 +289,13 @@ export class Scene {
     if (this.wind > 0.05 && Math.random() < dt / 25) this.sparts.push({ type: 'wind', x: this.windDir > 0 ? -60 : this.W + 60, y: 60 + Math.random() * (this.H - 120), vx: 1100 * this.windDir, vy: 0, g: 0, life: 1200, max: 1200, size: 40 + Math.random() * 80, rot: 0, vr: 0 });
     if (!this.busy && Math.random() < dt / 9000) this.goatSay(Math.floor(Math.random() * 3), ['Mäh!', 'Go on then!', 'Hopp Schwiiz!', 'Mäh-mäh!'][Math.floor(Math.random() * 4)], false);
     if (this.win) this.win.shown = lerp(this.win.shown, this.win.amount, 1 - Math.exp(-dt * 0.004));
+    this.nextFlyer -= dt;
+    if (this.nextFlyer <= 0 && this.flyers.length < 2) { this.spawnFlyer(); this.nextFlyer = 5000 + Math.random() * 8000; }
+    for (let i = this.flyers.length - 1; i >= 0; i--) {
+      const f = this.flyers[i];
+      f.t += dt; f.x += (f.vx * dt) / 1000; f.y += (f.vy * dt) / 1000;
+      if (f.x < -300 || f.x > this.W + 300) this.flyers.splice(i, 1);
+    }
   }
 
   // ---------- drawing helpers ----------
@@ -338,6 +365,113 @@ export class Scene {
     }
   }
 
+  // ---------- things in the sky ----------
+  private spawnFlyer() {
+    const kinds: FlyerKind[] = this.weather === 'storm' ? ['eagle', 'birds', 'helicopter'] : ['paraglider', 'eagle', 'birds', 'balloon', 'helicopter', 'plane'];
+    const kind = kinds[Math.floor(Math.random() * kinds.length)];
+    const dir = Math.random() < 0.5 ? 1 : -1;
+    const speed = { paraglider: 45, eagle: 70, birds: 60, balloon: 18, helicopter: 160, plane: 110 }[kind];
+    const skyH = (this.H - this.inset.bottom) * 0.45;
+    this.flyers.push({
+      kind, x: dir > 0 ? -200 : this.W + 200, y: this.inset.top + 70 + Math.random() * skyH, vx: dir * speed * (0.8 + Math.random() * 0.4),
+      vy: kind === 'balloon' ? -6 : kind === 'paraglider' ? 4 : 0, s: kind === 'balloon' ? 0.9 : 0.75 + Math.random() * 0.3, t: 0, hue: Math.floor(Math.random() * 4),
+    });
+  }
+  private drawFlyers() {
+    const c = this.ctx;
+    const canopy = ['#E2383F', '#FFC93C', '#3FA7D6', '#6CCB57'];
+    for (const f of this.flyers) {
+      const dir = Math.sign(f.vx) || 1, t = f.t / 1000;
+      c.save(); c.translate(f.x, f.y + Math.sin(t * 1.3) * 6); c.scale(f.s * dir, f.s);
+      if (f.kind === 'paraglider') {
+        c.beginPath(); c.moveTo(-50, 0); c.quadraticCurveTo(0, -34, 50, 0); c.quadraticCurveTo(0, -18, -50, 0); this.fillInk(canopy[f.hue], 3.5);
+        c.beginPath(); for (const x of [-30, -10, 10, 30]) { c.moveTo(x, -10); c.lineTo(0, 46); } c.lineWidth = 1.5; c.strokeStyle = C.ink; c.stroke();
+        this.ellipse(0, 52, 6, 6); this.fillInk(C.skin, 2.5);
+        this.rrect(-6, 56, 12, 14, 4); this.fillInk(canopy[(f.hue + 1) % 4], 2.5);
+      } else if (f.kind === 'eagle') {
+        const flap = Math.sin(t * 5) * 0.5;
+        for (const side of [-1, 1]) { c.save(); c.scale(side, 1); c.rotate(-flap * 0.4); c.beginPath(); c.moveTo(0, 0); c.quadraticCurveTo(22, -16 - flap * 14, 50, -6 - flap * 20); c.quadraticCurveTo(28, 2, 0, 6); this.fillInk('#6B4226', 3); c.restore(); }
+        this.ellipse(0, 4, 10, 7); this.fillInk('#6B4226', 3);
+        this.ellipse(12, 0, 6, 5); this.fillInk('#fff', 2.5);
+        c.beginPath(); c.moveTo(17, 0); c.lineTo(23, 3); c.lineTo(17, 4); this.fillInk(C.gold, 2);
+      } else if (f.kind === 'birds') {
+        for (let k = 0; k < 5; k++) {
+          const bx = -k * 26, by = Math.abs(k - 2) * 12 - k * 2, w = Math.sin(t * 9 + k) * 5;
+          c.beginPath(); c.moveTo(bx - 10, by - 4 - w); c.quadraticCurveTo(bx - 4, by - 6, bx, by); c.quadraticCurveTo(bx + 4, by - 6, bx + 10, by - 4 - w); this.ink(3);
+        }
+      } else if (f.kind === 'balloon') {
+        c.beginPath(); c.moveTo(0, 60); c.bezierCurveTo(-50, 20, -56, -60, 0, -64); c.bezierCurveTo(56, -60, 50, 20, 0, 60); c.closePath();
+        c.save(); c.clip();
+        for (let k = -3; k <= 3; k++) { c.fillStyle = (k + 3) % 2 ? canopy[f.hue] : '#fff'; c.fillRect(k * 16 - 8, -70, 16, 140); }
+        c.restore();
+        c.beginPath(); c.moveTo(0, 60); c.bezierCurveTo(-50, 20, -56, -60, 0, -64); c.bezierCurveTo(56, -60, 50, 20, 0, 60); this.ink(3.5);
+        c.beginPath(); c.moveTo(-8, 58); c.lineTo(-10, 76); c.moveTo(8, 58); c.lineTo(10, 76); this.ink(2);
+        this.rrect(-12, 74, 24, 16, 3); this.fillInk('#A8743E', 3);
+      } else if (f.kind === 'helicopter') {
+        this.ellipse(0, 0, 30, 16); this.fillInk(C.red, 3.5);
+        c.beginPath(); c.moveTo(-26, -2); c.lineTo(-70, -6); c.lineTo(-70, 4); c.lineTo(-26, 6); this.fillInk(C.red, 3);
+        this.ellipse(14, -4, 11, 8); this.fillInk('#BFE4F7', 2.5);
+        c.beginPath(); c.moveTo(-18, 22); c.lineTo(22, 22); c.moveTo(-10, 16); c.lineTo(-12, 22); c.moveTo(12, 16); c.lineTo(14, 22); this.ink(3);
+        const blade = Math.abs(Math.sin(t * 40)) * 46 + 8;
+        c.beginPath(); c.moveTo(-blade, -20); c.lineTo(blade, -20); this.ink(4);
+        c.beginPath(); c.moveTo(0, -16); c.lineTo(0, -20); this.ink(4);
+        const tail = Math.abs(Math.sin(t * 50)) * 10 + 3;
+        c.beginPath(); c.moveTo(-70, -1 - tail); c.lineTo(-70, -1 + tail); this.ink(3);
+      } else {
+        // A little plane towing a banner
+        c.beginPath(); c.moveTo(-60, 0); c.lineTo(-130, 0); this.ink(2);
+        c.save(); c.scale(dir, 1);
+        this.rrect(dir > 0 ? -300 : 130, -16, 170, 32, 4); this.fillInk('#fff', 3);
+        this.text('HOPP SCHWIIZ!', dir > 0 ? -215 : 215, 1, `20px ${FD}`, C.red, 0);
+        c.restore();
+        this.ellipse(0, 0, 30, 10); this.fillInk(C.gold, 3.5);
+        c.beginPath(); c.moveTo(-6, -2); c.lineTo(-14, -22); c.lineTo(6, -22); c.lineTo(10, -2); this.fillInk(C.gold, 3);
+        c.beginPath(); c.moveTo(-28, -2); c.lineTo(-38, -16); c.lineTo(-30, -16); c.lineTo(-20, -2); this.fillInk(C.gold, 3);
+        this.ellipse(10, -4, 7, 5); this.fillInk('#BFE4F7', 2.5);
+        const prop = Math.abs(Math.sin(t * 40)) * 14 + 2;
+        c.beginPath(); c.moveTo(32, -prop); c.lineTo(32, prop); this.ink(3);
+      }
+      c.restore();
+    }
+  }
+
+  // ---------- the rock face: boulders, cracks, pines, flowers, a cave and a waterfall ----------
+  private drawFace() {
+    // On a portrait phone the overview zoom is far smaller, so the face gets fewer, much bigger pieces spread
+    // further down the rock; at desktop size they'd crowd, at phone size the desktop ones are specks
+    const c = this.ctx, k = PORTRAIT ? 2.6 : 1;
+    for (let i = 0; i <= TOP; i++) {
+      if (PORTRAIT && i % 2) continue;
+      for (const it of FACE[i]) {
+        const x = i * SW + it.dx * SW, y = stepTop(i) + CAP + it.depth * SH * (PORTRAIT ? 1.9 : 1.6), s = it.size * k;
+        c.save(); c.translate(x, y); c.scale(s, s);
+        if (it.kind === 'boulder') { this.ellipse(0, 0, 22, 15); this.fillInk('#7E6CA6', 3.5); this.ellipse(-6, -5, 7, 4); c.fillStyle = '#9A8BC2'; c.fill(); }
+        else if (it.kind === 'crack') { c.beginPath(); c.moveTo(-4, -18); c.lineTo(4, -6); c.lineTo(-3, 4); c.lineTo(5, 18); c.moveTo(4, -6); c.lineTo(14, -2); this.ink(3.5); }
+        else if (it.kind === 'pine') {
+          c.beginPath(); c.moveTo(-18, 8); c.lineTo(18, 8); this.ink(5);
+          for (let t = 0; t < 3; t++) { c.beginPath(); c.moveTo(-14 + t * 3, 4 - t * 12); c.lineTo(0, -16 - t * 12); c.lineTo(14 - t * 3, 4 - t * 12); c.closePath(); this.fillInk(C.grassD, 3); }
+        }
+        else if (it.kind === 'flowers') { for (const [fx, col] of [[-10, '#FFC93C'], [0, '#fff'], [10, '#E2383F']] as const) { c.beginPath(); c.moveTo(fx, 10); c.lineTo(fx, 0); this.ink(2.5); this.ellipse(fx, -2, 4, 4); this.fillInk(col, 2); } }
+        else if (it.kind === 'crystal') { c.beginPath(); c.moveTo(-8, 10); c.lineTo(-10, -6); c.lineTo(-4, -18); c.lineTo(2, -6); c.lineTo(0, 10); c.closePath(); this.fillInk('#BFE4F7', 3); c.beginPath(); c.moveTo(0, 10); c.lineTo(6, -10); c.lineTo(12, 10); c.closePath(); this.fillInk('#E5F6FF', 3); }
+        else { this.ellipse(0, 0, 26, 9); this.fillInk('#fff', 3); }
+        c.restore();
+      }
+    }
+    // The cave: a dark mouth with two eyes that blink now and then
+    const cx = CAVE_STEP * SW + SW * 0.5, cy = stepTop(CAVE_STEP) + CAP + SH * (PORTRAIT ? 3.2 : 3.6), cs = k * 1.2;
+    c.save(); c.translate(cx, cy); c.scale(cs, cs);
+    c.beginPath(); c.moveTo(-30, 18); c.quadraticCurveTo(-32, -26, 0, -28); c.quadraticCurveTo(32, -26, 30, 18); c.closePath(); this.fillInk('#1E1530', 4);
+    if (Math.floor(this.clock / 2600) % 3 !== 0 && (this.clock % 2600) > 180) { this.ellipse(-7, -4, 3.5, 4); this.ellipse(7, -4, 3.5, 4); c.fillStyle = C.gold; c.fill(); }
+    c.restore();
+    // The waterfall: a white ribbon with dashes sliding down it
+    const fx = FALL_STEP * SW + SW * 0.7, top = stepTop(FALL_STEP) + CAP * 0.6, len = SH * (PORTRAIT ? 4 : 5);
+    c.beginPath(); c.moveTo(fx - 8 * k, top); c.lineTo(fx + 8 * k, top); c.lineTo(fx + 12 * k, top + len); c.lineTo(fx - 12 * k, top + len); c.closePath(); this.fillInk('#BFE4F7', 3);
+    c.save(); c.clip(); c.strokeStyle = '#fff'; c.lineWidth = 3;
+    for (let d = 0; d < 6; d++) { const yy = top + ((this.clock * 0.12 + d * len / 6) % len); c.beginPath(); c.moveTo(fx - 3 * k, yy); c.lineTo(fx - 3 * k, yy + 14 * k); c.moveTo(fx + 4 * k, yy + 8 * k); c.lineTo(fx + 4 * k, yy + 20 * k); c.stroke(); }
+    c.restore();
+    this.ellipse(fx, top + len, 20 * k, 7 * k); this.fillInk('#fff', 3);
+  }
+
   // ---------- the ridge ----------
   private drawRidge() {
     const c = this.ctx;
@@ -351,6 +485,7 @@ export class Scene {
     c.save(); c.clip();
     c.strokeStyle = C.massD; c.lineWidth = 6;
     for (let k = 0; k < 40; k++) { const y = -1200 + k * 70; c.beginPath(); c.moveTo(-900, y + 300); c.lineTo(edgeX() + 100, y - 900); c.stroke(); }
+    this.drawFace();
     c.restore();
     const cap = (x0: number, x1: number, top: number, i: number) => {
       const [fill, dark] = i <= 9 ? [C.grass, C.grassD] : i <= 19 ? [C.rock, C.rockD] : [C.snow, C.snowD];
@@ -681,6 +816,7 @@ export class Scene {
     this.drawSky();
     this.drawRange(FAR, 0.05, this.H * 0.61, P.far, P.farSnow, 3);
     this.drawClouds(P.cloud);
+    this.drawFlyers();
     this.drawRange(MID, 0.14, this.H * 0.8, P.mid, P.midSnow, 4);
     this.drawFog();
     c.save(); c.translate(this.W / 2, this.H / 2); c.scale(this.cam.z, this.cam.z); c.translate(-this.cam.x, -this.cam.y);
