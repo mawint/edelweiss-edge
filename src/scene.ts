@@ -119,7 +119,7 @@ export class Scene {
   private win: { text: string; sub: string; amount: number; shown: number; format: (v: number) => string } | null = null;
   private flyers: Flyer[] = [];
   /** The step counter: spins to a climb's step count, then counts down as he walks. */
-  private reel: { climb: number | 'echo'; pos: number; target: number; remaining: number | null; alpha: number; drop: number; swing: number; note: string } | null = null;
+  private reel: { climb: number | 'echo'; pos: number; target: number; remaining: number | null; alpha: number; drop: number; dock: number; swing: number; note: string } | null = null;
   private wipe: { t: number; swapped: boolean; swap: () => void; done: () => void } | null = null;
   private nextFlyer = 1500;
 
@@ -1044,7 +1044,7 @@ export class Scene {
    * `climb` is which climb this is (1-3), or 'echo' for the Alphorn Echo's replay.
    */
   async spinCounter(climb: number | 'echo', steps: number) {
-    const r = { climb, pos: 0, target: steps, remaining: null as number | null, alpha: 1, drop: 0, swing: 0, note: '' };
+    const r = { climb, pos: 0, target: steps, remaining: null as number | null, alpha: 1, drop: 0, dock: 0, swing: 0, note: '' };
     this.reel = r;
     play('whoosh');
     await this.tween(this.reduce ? 1 : 320, (p) => { r.drop = p; }, backOut);
@@ -1063,6 +1063,9 @@ export class Scene {
     r.remaining = steps;
     r.note = steps === 0 ? 'Yodel break!' : steps === 1 ? 'step to go' : 'steps to go';
     await this.sleep(500);
+    // Number known: tuck the bell into the top-left corner (sky behind him, whichever way the ridge runs)
+    // so it keeps counting without covering the climb; he sets off while it moves
+    void this.tween(this.reduce ? 1 : 450, (p) => { r.dock = p; }, easeInOut);
   }
   /** The bell rises back out of view once the climb is done. */
   async hideCounter() {
@@ -1087,10 +1090,16 @@ export class Scene {
     const c = this.ctx, t = this.clock;
     r.swing *= 0.985;
     // (hung just under the altitude bar, so the strap doesn't cover it)
-    const cx = this.W / 2, hang = this.inset.top + 68;
-    const y0 = hang - 230 * (1 - r.drop);
+    const hang = this.inset.top + 68;
+    // Centre stage while it spins; docked small in the top-left corner once the number is known
+    const cx = lerp(this.W / 2, 70, r.dock), cy = lerp(hang, this.inset.top + 66, r.dock), sc = lerp(1, 0.5, r.dock);
+    const y0 = cy - 230 * (1 - r.drop) * (1 - r.dock);
     const angle = r.swing * Math.sin(t / 110) * 0.22;
-    c.save(); c.translate(cx, y0); c.rotate(angle);
+    c.save();
+    // (a docked bell fades out rather than rising back up)
+    c.globalAlpha = r.dock > 0.5 ? r.drop : 1;
+    c.translate(cx, y0); c.scale(sc, sc);
+    c.save(); c.rotate(angle);
     // Strap: red with white stitching, and the climb pips (or ECHO) on a little plaque
     this.rrect(-13, -20, 26, 58, 6); this.fillInk(C.red, 4);
     c.setLineDash([5, 5]); c.beginPath(); c.moveTo(-6, -16); c.lineTo(-6, 34); c.moveTo(6, -16); c.lineTo(6, 34); c.lineWidth = 2; c.strokeStyle = '#fff'; c.stroke(); c.setLineDash([]);
@@ -1135,13 +1144,15 @@ export class Scene {
     // A red pointer on each side of the window marks the line the reel stops on
     for (const sx of [-1, 1]) { c.beginPath(); c.moveTo(sx * 46, wy + wh / 2 - 7); c.lineTo(sx * 38, wy + wh / 2); c.lineTo(sx * 46, wy + wh / 2 + 7); c.closePath(); this.fillInk(C.red, 2.5); }
     c.restore();
-    // The label hangs still under the bell
+    // The label hangs still under the bell (larger type once docked, so it stays readable at half size)
     if (r.note && r.drop > 0.9) {
-      c.font = `800 17px ${FU}`;
-      const w = c.measureText(r.note).width + 26, ly = y0 + 196;
-      this.rrect(cx - w / 2, ly - 15, w, 30, 15); this.fillInk(C.ink, 0);
-      this.text(r.note, cx, ly + 1, `800 17px ${FU}`, C.cream, 0);
+      const size = lerp(17, 26, r.dock);
+      c.font = `800 ${size}px ${FU}`;
+      const w = c.measureText(r.note).width + size * 1.5, h = size * 1.75, ly = 196 + r.dock * 8;
+      this.rrect(-w / 2, ly - h / 2, w, h, h / 2); this.fillInk(C.ink, 0);
+      this.text(r.note, 0, ly + 1, `800 ${size}px ${FU}`, C.cream, 0);
     }
+    c.restore();
   }
 
 
