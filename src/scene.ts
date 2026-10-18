@@ -18,6 +18,8 @@ const stand = (i: number) => (i > TOP ? { x: edgeX() + 50, y: stepTop(TOP) } : {
 const PORTRAIT_SW = { overview: 58, climb: 116 };
 /** The cloud wipe's timing (ms): sweep in, hold while the ridge and camera swap, sweep out. */
 const WIPE = { cover: 380, hold: 120, reveal: 420 };
+/** What's underfoot on a step, for footstep sounds: 0 grass, 1 rock, 2 snow (matching the caps). */
+const groundAt = (i: number) => (i <= 9 ? 0 : i <= 19 ? 1 : 2);
 const topAtX = (x: number) => stepTop(Math.max(0, Math.min(TOP, Math.floor(x / SW))));
 /** The whole ridge, flags included, for the overview camera. */
 const ridge = () =>
@@ -1012,13 +1014,17 @@ export class Scene {
     // On a wide step he walks a couple of strides to the edge first, then hops up
     if (target === u.step + 1 && SW >= 90) {
       const edge = { x: (u.step + 1) * SW - 16, y: a.y };
+      let strides = 0;
       await this.tween(dur * 0.6, (p) => {
         u.x = lerp(a.x, edge.x, p); u.y = a.y - Math.abs(Math.sin(p * Math.PI * 2)) * 4; u.walk = p * Math.PI * 4;
+        // a quiet footstep each time a boot comes down, sounding like the ground he's on
+        if (strides < 2 && p >= (strides + 0.5) / 2) { strides++; play('step', groundAt(u.step)); }
       });
       a.x = edge.x; a.y = edge.y;
     }
     await this.tween(dur, (p) => { u.x = lerp(a.x, b.x, p); u.y = lerp(a.y, b.y, p) - Math.sin(p * Math.PI) * h; u.walk = p * Math.PI * 2; });
     u.step = target; u.sq = 0.3; u.walk = 0; u.pose = 'idle';
+    play('step', groundAt(target));
     this.burst(u.x, u.y, 5, 'dust', { speed: 90, size: 7, g: -40, life: 450, spread: Math.PI * 0.9 });
     o.onLand?.(target);
   }

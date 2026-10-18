@@ -210,9 +210,25 @@ const SFX: Record<Sfx, Play> = {
     f.frequency.exponentialRampToValueAtTime(1800, t + 0.12);
     env(ac, out, through(noise(ac, t, 0.15), f), t, 0.01, 0.12, 0.05);
   },
-  /** A boot on rock or grass. */
-  step(ac, out, t) {
-    env(ac, out, through(noise(ac, t, 0.08), filter(ac, 'lowpass', 700 + Math.random() * 300)), t, 0.002, 0.06, 0.12);
+  /**
+   * A footstep, quiet and a little different each time. `arg` is the ground: 0 grass (a soft thud),
+   * 1 rock (a gritty scuff), 2 snow (a crunch of tiny grains).
+   */
+  step(ac, out, t, ground = 0) {
+    const v = 0.85 + Math.random() * 0.3;
+    if (ground === 2) {
+      for (let k = 0; k < 5; k++) {
+        const at = t + k * 0.012 + Math.random() * 0.008;
+        env(ac, out, through(noise(ac, at, 0.03), filter(ac, 'bandpass', 2600 + Math.random() * 1800, 1.5)), at, 0.001, 0.02, 0.05 * v);
+      }
+      env(ac, out, through(noise(ac, t, 0.1), filter(ac, 'lowpass', 900)), t, 0.004, 0.08, 0.05 * v);
+    } else if (ground === 1) {
+      env(ac, out, through(noise(ac, t, 0.07), filter(ac, 'bandpass', 1700 + Math.random() * 600, 1.2)), t, 0.002, 0.05, 0.07 * v);
+      env(ac, out, through(noise(ac, t, 0.06), filter(ac, 'lowpass', 300)), t, 0.002, 0.05, 0.1 * v);
+    } else {
+      env(ac, out, through(noise(ac, t, 0.1), filter(ac, 'lowpass', 420 + Math.random() * 160)), t, 0.004, 0.08, 0.12 * v);
+      env(ac, out, through(noise(ac, t + 0.01, 0.05), filter(ac, 'bandpass', 3200, 2)), t + 0.01, 0.002, 0.03, 0.015 * v);
+    }
   },
   /** Landing on the next step: a soft thump with some weight. */
   land(ac, out, t) {
@@ -374,7 +390,7 @@ export async function checkSounds(): Promise<string[]> {
 }
 
 /** QA: render a few sounds one after another into an offline buffer, to listen to outside the game. */
-export async function renderSounds(names: Sfx[], gap = 1.4): Promise<AudioBuffer> {
+export async function renderSounds(names: (Sfx | [Sfx, number])[], gap = 1.4): Promise<AudioBuffer> {
   const off = new OfflineAudioContext(2, Math.ceil(44100 * (names.length * gap + 2.5)), 44100);
   const comp = off.createDynamicsCompressor();
   comp.connect(off.destination);
@@ -382,6 +398,9 @@ export async function renderSounds(names: Sfx[], gap = 1.4): Promise<AudioBuffer
   const b = off.createGain(); b.connect(m);
   const verb = off.createConvolver(); verb.buffer = impulse(off as unknown as AudioContext, 2.4);
   const send = off.createGain(); send.gain.value = 0.22; b.connect(send); send.connect(verb); verb.connect(m);
-  names.forEach((n, i) => SFX[n](off as unknown as AudioContext, b, 0.1 + i * gap, n === 'bell' && i === 0 ? 0 : 1));
+  names.forEach((n, i) => {
+    const [name, arg] = Array.isArray(n) ? n : [n, 1];
+    SFX[name](off as unknown as AudioContext, b, 0.1 + i * gap, arg);
+  });
   return off.startRendering();
 }
