@@ -357,7 +357,7 @@ function waitForPlay(): Promise<void> {
   $('load').hidden = true;
   play.hidden = false;
   $('splash').classList.add('ready');
-  play.focus();
+  // (no play.focus(): browsers drew a focus ring around it; Enter and Space are caught by wireSplash's handler)
   return new Promise((resolve) => { entered = resolve; if (enterEarly) enter(); });
 }
 function enter() {
