@@ -54,9 +54,13 @@ small { display: block; font-weight: 500; font-size: 11px; color: var(--muted); 
 .val b { font-size: 16px; }
 .balance { flex: none; }
 .climb {
-  flex: 1; font-family: var(--display); font-weight: 400; font-size: 30px; padding: 8px 16px 4px; background: var(--gold);
+  flex: 1; font-family: var(--display); font-weight: 400; font-size: 30px; padding: 6px 16px; background: var(--gold);
   border-width: 4px; border-radius: 16px; box-shadow: 0 5px 0 var(--ink);
+  display: flex; align-items: center; justify-content: center; line-height: 1;
 }
+/* Luckiest Guy's capitals sit 0.14em above the middle of its line box (the box keeps room for descenders
+   the capitals never use), so the label is nudged down by exactly that to sit centred */
+.climb span { position: relative; top: 0.14em; }
 /* Climb with its two helpers on either side: turbo on the left, autoplay on the right */
 .go { flex: 1; display: flex; align-items: stretch; gap: 6px; }
 .go .climb { flex: 1; }
@@ -103,13 +107,25 @@ small { display: block; font-weight: 500; font-size: 11px; color: var(--muted); 
 .checks input { width: 22px; height: 22px; accent-color: var(--red); }
 .climb.start { margin: 0 14px 14px; }
 
+/* Sound on/off, always in the top-right corner (the step counter docks top-left) */
+.corner-sound {
+  position: absolute; top: max(8px, env(safe-area-inset-top)); right: max(8px, env(safe-area-inset-right));
+  width: 42px; min-height: 42px; padding: 0; display: grid; place-items: center; background: var(--cream); border-radius: 50%;
+}
+.corner-sound svg { width: 24px; height: 24px; fill: none; stroke: var(--ink); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.corner-sound .spk { fill: var(--ink); }
+.corner-sound .mute { display: none; }
+.corner-sound[aria-pressed='false'] .waves { display: none; }
+.corner-sound[aria-pressed='false'] .mute { display: inline; stroke: var(--red); }
+@media (max-height: 300px) { .corner-sound { width: 30px; min-height: 30px; top: 4px; right: 4px; } .corner-sound svg { width: 18px; height: 18px; } }
+
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
 /* Phones in portrait: two rows (menu, difficulty, bet; then Climb with the balance) */
 @media (max-width: 560px) {
   .deck { flex-wrap: wrap; gap: 6px; padding: 6px; }
   .pick { flex: 1; }
-  .climb { font-size: 24px; padding: 6px 10px 2px; }
+  .climb { font-size: 24px; padding: 6px 10px; }
   /* the balance rides on a tab above the deck, so the deck is just two rows */
   .balance {
     position: absolute; right: 14px; bottom: 100%; display: flex; align-items: baseline; gap: 6px;
@@ -131,7 +147,7 @@ small { display: block; font-weight: 500; font-size: 11px; color: var(--muted); 
   .val { min-width: 4.2em; }
   .icon.side { width: 42px; font-size: 17px; }
   .icon.side small { display: none; }
-  .climb { font-size: 22px; padding: 4px 12px 1px; border-width: 3px; box-shadow: 0 3px 0 var(--ink); }
+  .climb { font-size: 22px; padding: 4px 12px; border-width: 3px; box-shadow: 0 3px 0 var(--ink); }
 }
 /* Short screens (the 400×225 popout): one tight row, labels dropped */
 @media (max-height: 300px) {
@@ -142,7 +158,7 @@ small { display: block; font-weight: 500; font-size: 11px; color: var(--muted); 
   .pick { min-width: 0; flex: none; }
   .pick b, .val b { font-size: 12px; }
   .val { min-width: 3.4em; }
-  .climb { order: 0; font-size: 16px; padding: 3px 8px 1px; border-width: 2px; box-shadow: 0 2px 0 var(--ink); }
+  .climb { order: 0; font-size: 16px; padding: 3px 8px; border-width: 2px; box-shadow: 0 2px 0 var(--ink); }
   .go { flex: 1; gap: 3px; }
   .icon.side { width: 30px; font-size: 14px; }
   .sheet h2 { font-size: 22px; }

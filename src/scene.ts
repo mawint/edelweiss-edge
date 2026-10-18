@@ -210,7 +210,7 @@ export class Scene {
     const changed = JSON.stringify(w) !== JSON.stringify(this.window);
     this.window = w;
     this.info = info;
-    if (changed && this.dragging) play('hop');
+    if (changed && this.dragging) play('tick');
   }
 
   // ---------- tweens on the game clock ----------
@@ -873,7 +873,8 @@ export class Scene {
     });
   }
   private drawMinimap() {
-    const c = this.ctx, w = Math.min(640, this.W - 220), x0 = (this.W - w) / 2, y = this.inset.top + 14, h = 24, seg = w / 27;
+    // (narrower than the screen by enough to clear its labels and the corner sound button)
+    const c = this.ctx, w = Math.min(640, this.W - 320), x0 = (this.W - w) / 2, y = this.inset.top + 14, h = 24, seg = w / 27;
     this.rrect(x0 - 6, y - 4, w + 12, h + 8, 12); this.fillInk('rgba(255,244,223,.92)', 3.5);
     const win = this.window;
     if (win === 'edge') { c.fillStyle = C.red; c.fillRect(x0 + 26 * seg, y, seg, h); }
@@ -1004,21 +1005,21 @@ export class Scene {
   private async hop(target: number, o: { dur?: number; height?: number; ring?: number; onLand?: (step: number) => void } = {}) {
     const u = this.u, a = { x: u.x, y: u.y }, b = stand(target);
     u.dir = b.x >= a.x ? 1 : -1;
-    if (o.ring) { u.ring = 1; play('bell', 1 + Math.min(12, o.ring) * 0.035); this.pop(u.x + 30 * u.dir, u.y - 150, String(o.ring), C.gold, 52); }
-    play('hop');
+    // (no sound per step: a clank on every step got grating; the counter shows the count)
+    if (o.ring) { u.ring = 1; this.pop(u.x + 30 * u.dir, u.y - 150, String(o.ring), C.gold, 52); }
     u.sq = -0.22; u.pose = 'hop';
     const h = o.height ?? 36, dur = o.dur ?? 300;
     // On a wide step he walks a couple of strides to the edge first, then hops up
     if (target === u.step + 1 && SW >= 90) {
       const edge = { x: (u.step + 1) * SW - 16, y: a.y };
-      await this.tween(dur * 0.6, (p) => { u.x = lerp(a.x, edge.x, p); u.y = a.y - Math.abs(Math.sin(p * Math.PI * 2)) * 4; u.walk = p * Math.PI * 4; });
+      await this.tween(dur * 0.6, (p) => {
+        u.x = lerp(a.x, edge.x, p); u.y = a.y - Math.abs(Math.sin(p * Math.PI * 2)) * 4; u.walk = p * Math.PI * 4;
+      });
       a.x = edge.x; a.y = edge.y;
-      play('hop');
     }
     await this.tween(dur, (p) => { u.x = lerp(a.x, b.x, p); u.y = lerp(a.y, b.y, p) - Math.sin(p * Math.PI) * h; u.walk = p * Math.PI * 2; });
     u.step = target; u.sq = 0.3; u.walk = 0; u.pose = 'idle';
     this.burst(u.x, u.y, 5, 'dust', { speed: 90, size: 7, g: -40, life: 450, spread: Math.PI * 0.9 });
-    play('land');
     o.onLand?.(target);
   }
 

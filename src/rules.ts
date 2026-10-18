@@ -70,7 +70,7 @@ export function rulesHtml(social: boolean): string {
 <li><b>Climb!</b> (or the space bar): ${w('places the bet and starts the climb', 'starts the climb')}.</li>
 <li><b>Turbo (»):</b> plays the climb twice as fast. Tap again to turn it off.</li>
 <li><b>Autoplay (↻):</b> opens a panel to choose how many climbs (10, 25, 50 or 100) and when to stop early (after any win, or after a win of 20× or more); nothing starts until you press Start. While it runs, Climb becomes <b>Stop</b> and shows the climbs left; Stop or the space bar ends it. It also stops when your balance is too low.</li>
-<li><b>Sound (in the menu):</b> turns all sound on or off.</li>
+<li><b>Sound (the speaker in the top-right corner, or in the menu):</b> turns all sound on or off.</li>
 <li><b>Close (✕):</b> closes a menu.</li>
 </ul>
 

@@ -137,7 +137,7 @@ function syncControls() {
   for (const b of document.querySelectorAll<HTMLButtonElement>('.deck button')) b.disabled = busy && !['menu-open', 'turbo'].includes(b.id);
   const climbBtn = $<HTMLButtonElement>('climb');
   climbBtn.classList.toggle('stop', autoplaying);
-  climbBtn.textContent = autoplaying ? `Stop · ${auto.left}` : 'Climb!';
+  climbBtn.querySelector('span')!.textContent = autoplaying ? `Stop · ${auto.left}` : 'Climb!';
   climbBtn.disabled = autoplaying ? false : busy;
   scene.dragEnabled = !busy && state.difficulty !== 'edge';
 }
@@ -196,7 +196,7 @@ function syncAutoSheet() {
   for (const b of document.querySelectorAll<HTMLButtonElement>('[data-rounds]')) b.setAttribute('aria-pressed', String(Number(b.dataset.rounds) === auto.rounds));
   $<HTMLInputElement>('auto-stop-win').checked = auto.stopOnWin;
   $<HTMLInputElement>('auto-stop-big').checked = auto.stopOnBig;
-  $('auto-start').textContent = `Start ${auto.rounds} climbs`;
+  $('auto-start').querySelector('span')!.textContent = `Start ${auto.rounds} climbs`;
 }
 
 const TURBO_KEY = 'edelweiss.turbo';
@@ -256,9 +256,13 @@ function wireControls() {
     void runAutoplay();
   });
 
-  const sound = $<HTMLButtonElement>('sound');
-  const showSound = () => { sound.setAttribute('aria-pressed', String(soundOn())); sound.querySelector('b')!.textContent = soundOn() ? 'On' : 'Off'; };
-  sound.addEventListener('click', () => { setSound(!soundOn()); showSound(); });
+  // Sound: the corner button and the menu's toggle are the same switch
+  const sound = $<HTMLButtonElement>('sound'), corner = $<HTMLButtonElement>('sound-corner');
+  const showSound = () => {
+    sound.setAttribute('aria-pressed', String(soundOn())); sound.querySelector('b')!.textContent = soundOn() ? 'On' : 'Off';
+    corner.setAttribute('aria-pressed', String(soundOn())); corner.setAttribute('aria-label', soundOn() ? 'Sound on' : 'Sound off');
+  };
+  for (const b of [sound, corner]) b.addEventListener('click', () => { setSound(!soundOn()); showSound(); });
   showSound();
   const turbo = $<HTMLButtonElement>('turbo');
   const showTurbo = () => turbo.setAttribute('aria-pressed', String(scene.speed > 1));
