@@ -12,7 +12,10 @@ let PORTRAIT = false;
 const CAP = 30;
 const edgeX = () => (TOP + 1) * SW;
 const stepTop = (i: number) => -Math.max(0, Math.min(i, TOP)) * SH;
-const stand = (i: number) => (i > TOP ? { x: edgeX() + 50, y: stepTop(TOP) } : { x: i * SW + SW / 2, y: stepTop(i) });
+/** Where Ueli stands on step i: toward its back, leaving room to walk to the edge before the next hop. */
+const stand = (i: number) => (i > TOP ? { x: edgeX() + 50, y: stepTop(TOP) } : { x: i * SW + SW * 0.35, y: stepTop(i) });
+/** Phones: narrow steps so the whole ridge fits between rounds, twice as wide once the camera zooms in on the climb. */
+const PORTRAIT_SW = { overview: 58, climb: 116 };
 const topAtX = (x: number) => stepTop(Math.max(0, Math.min(TOP, Math.floor(x / SW))));
 /** The whole ridge, flags included, for the overview camera. */
 const ridge = () =>
@@ -146,7 +149,7 @@ export class Scene {
     const portrait = aspect < 0.8;
     if (portrait !== PORTRAIT) {
       PORTRAIT = portrait;
-      [SW, SH] = portrait ? [58, 84] : [104, 46];
+      [SW, SH] = portrait ? [this.mode === 'overview' ? PORTRAIT_SW.overview : PORTRAIT_SW.climb, 84] : [104, 46];
       // (between rounds Ueli just moves with his step; mid-round the next hop catches up)
       if (this.u) this.placeAt(this.u.step);
     }
@@ -236,6 +239,15 @@ export class Scene {
     this.scale += (this.scaleTarget - this.scale) * Math.min(1, dt * 0.006);
     this.tension += (this.tensionTarget - this.tension) * Math.min(1, dt * 0.005);
     const u = this.u;
+    // On phones the ridge stretches while the camera swoops in (and back as it pulls out); Ueli is standing
+    // still at those moments, so he just moves with his step
+    if (PORTRAIT) {
+      const want = this.mode === 'overview' ? PORTRAIT_SW.overview : PORTRAIT_SW.climb;
+      if (Math.abs(SW - want) > 0.05) {
+        SW += (want - SW) * (1 - Math.exp(-dt * 0.004));
+        if (u.pose === 'idle' && u.step <= TOP) { const p = stand(u.step); u.x = p.x; u.y = p.y; }
+      } else SW = want;
+    }
     let t;
     if (this.mode === 'overview') t = this.overview();
     else if (this.mode === 'fall') t = { x: u.x - 40, y: u.y - 90, z: 0.85 };
@@ -946,8 +958,15 @@ export class Scene {
     if (o.ring) { u.ring = 1; play('bell', 1 + Math.min(12, o.ring) * 0.035); this.pop(u.x + 30 * u.dir, u.y - 150, String(o.ring), C.gold, 52); }
     play('hop');
     u.sq = -0.22; u.pose = 'hop';
-    const h = o.height ?? 36;
-    await this.tween(o.dur ?? 300, (p) => { u.x = lerp(a.x, b.x, p); u.y = lerp(a.y, b.y, p) - Math.sin(p * Math.PI) * h; u.walk = p * Math.PI * 2; });
+    const h = o.height ?? 36, dur = o.dur ?? 300;
+    // On a wide step he walks a couple of strides to the edge first, then hops up
+    if (target === u.step + 1 && SW >= 90) {
+      const edge = { x: (u.step + 1) * SW - 16, y: a.y };
+      await this.tween(dur * 0.6, (p) => { u.x = lerp(a.x, edge.x, p); u.y = a.y - Math.abs(Math.sin(p * Math.PI * 2)) * 4; u.walk = p * Math.PI * 4; });
+      a.x = edge.x; a.y = edge.y;
+      play('hop');
+    }
+    await this.tween(dur, (p) => { u.x = lerp(a.x, b.x, p); u.y = lerp(a.y, b.y, p) - Math.sin(p * Math.PI) * h; u.walk = p * Math.PI * 2; });
     u.step = target; u.sq = 0.3; u.walk = 0; u.pose = 'idle';
     this.burst(u.x, u.y, 5, 'dust', { speed: 90, size: 7, g: -40, life: 450, spread: Math.PI * 0.9 });
     play('land');
