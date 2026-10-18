@@ -63,21 +63,15 @@ interface Task { t: number; ms: number; fn: (p: number) => void; ease: (p: numbe
 type FlyerKind = 'paraglider' | 'eagle' | 'birds' | 'balloon' | 'helicopter' | 'plane';
 interface Flyer { kind: FlyerKind; x: number; y: number; vx: number; vy: number; s: number; t: number; hue: number }
 
-/** What lives on the rock face under each step, fixed per step so it doesn't flicker. */
-type FaceKind = 'boulder' | 'crack' | 'pine' | 'flowers' | 'cave' | 'crystal' | 'drift';
-const FACE: { kind: FaceKind; dx: number; depth: number; size: number }[][] = Array.from({ length: TOP + 1 }, (_, i) => {
-  const pick = (k: number): FaceKind => {
-    const h = hash(i * 31 + k * 7);
-    if (i <= 9) return h < 0.3 ? 'pine' : h < 0.5 ? 'flowers' : h < 0.75 ? 'boulder' : 'crack';
-    if (i <= 19) return h < 0.35 ? 'boulder' : h < 0.65 ? 'crack' : h < 0.8 ? 'pine' : 'crystal';
-    return h < 0.4 ? 'crystal' : h < 0.7 ? 'drift' : 'crack';
-  };
-  const items = [{ kind: pick(1), dx: 0.2 + hash(i + 300) * 0.6, depth: 0.9 + hash(i + 400) * 1.2, size: 0.8 + hash(i + 500) * 0.5 }];
-  if (hash(i + 600) > 0.45) items.push({ kind: pick(2), dx: 0.15 + hash(i + 700) * 0.7, depth: 2.4 + hash(i + 800) * 1.8, size: 0.7 + hash(i + 900) * 0.5 });
-  return items;
-});
-/** A cave (with something blinking inside) and a waterfall, at fixed places on the face. */
-const CAVE_STEP = 13, FALL_STEP = 7;
+/** Props that sit on the rock shelves. Which ones depend on altitude: meadow things low, ice high. */
+type Prop = 'pine' | 'pines' | 'flowers' | 'boulder' | 'crystal' | 'drift';
+const propFor = (alt: number, h: number): Prop => {
+  if (alt < 0.4) return h < 0.35 ? 'pine' : h < 0.6 ? 'pines' : h < 0.85 ? 'flowers' : 'boulder';
+  if (alt < 0.75) return h < 0.4 ? 'boulder' : h < 0.65 ? 'pine' : 'crystal';
+  return h < 0.45 ? 'crystal' : h < 0.8 ? 'drift' : 'boulder';
+};
+/** The cave and the waterfall's shelves, by band and by where along the ridge (0..1). */
+const CAVE = { band: 2, at: 0.52 }, FALL = { at: 0.27 };
 
 const freshUeli = (): Ueli => ({ x: stand(0).x, y: 0, step: 0, rot: 0, sq: 0, lean: 0, ring: 0, swing: 0, face: 'happy', horn: 0, walk: 0, dir: 1, pose: 'idle' });
 
@@ -435,41 +429,99 @@ export class Scene {
     }
   }
 
-  // ---------- the rock face: boulders, cracks, pines, flowers, a cave and a waterfall ----------
+  // ---------- the rock face: layers parallel to the ridge, with shelves that props stand on ----------
+  /** The ridge's slope line (through the cap bottoms), so the layers and shelves follow the climb. */
+  private faceY(x: number, band: number) { return CAP - (x / SW) * SH + band * this.bandGap(); }
+  private bandGap() { return PORTRAIT ? SH * 2.6 : SH * 3.2; }
+  /** Props are sized for how far away the overview camera is, so they read on a phone as well as a desktop. */
+  private propScale() { return PORTRAIT ? 2.6 : 1.7; }
+
   private drawFace() {
-    // On a portrait phone the overview zoom is far smaller, so the face gets fewer, much bigger pieces spread
-    // further down the rock; at desktop size they'd crowd, at phone size the desktop ones are specks
-    const c = this.ctx, k = PORTRAIT ? 2.6 : 1;
-    for (let i = 0; i <= TOP; i++) {
-      if (PORTRAIT && i % 2) continue;
-      for (const it of FACE[i]) {
-        const x = i * SW + it.dx * SW, y = stepTop(i) + CAP + it.depth * SH * (PORTRAIT ? 1.9 : 1.6), s = it.size * k;
-        c.save(); c.translate(x, y); c.scale(s, s);
-        if (it.kind === 'boulder') { this.ellipse(0, 0, 22, 15); this.fillInk('#7E6CA6', 3.5); this.ellipse(-6, -5, 7, 4); c.fillStyle = '#9A8BC2'; c.fill(); }
-        else if (it.kind === 'crack') { c.beginPath(); c.moveTo(-4, -18); c.lineTo(4, -6); c.lineTo(-3, 4); c.lineTo(5, 18); c.moveTo(4, -6); c.lineTo(14, -2); this.ink(3.5); }
-        else if (it.kind === 'pine') {
-          c.beginPath(); c.moveTo(-18, 8); c.lineTo(18, 8); this.ink(5);
-          for (let t = 0; t < 3; t++) { c.beginPath(); c.moveTo(-14 + t * 3, 4 - t * 12); c.lineTo(0, -16 - t * 12); c.lineTo(14 - t * 3, 4 - t * 12); c.closePath(); this.fillInk(C.grassD, 3); }
-        }
-        else if (it.kind === 'flowers') { for (const [fx, col] of [[-10, '#FFC93C'], [0, '#fff'], [10, '#E2383F']] as const) { c.beginPath(); c.moveTo(fx, 10); c.lineTo(fx, 0); this.ink(2.5); this.ellipse(fx, -2, 4, 4); this.fillInk(col, 2); } }
-        else if (it.kind === 'crystal') { c.beginPath(); c.moveTo(-8, 10); c.lineTo(-10, -6); c.lineTo(-4, -18); c.lineTo(2, -6); c.lineTo(0, 10); c.closePath(); this.fillInk('#BFE4F7', 3); c.beginPath(); c.moveTo(0, 10); c.lineTo(6, -10); c.lineTo(12, 10); c.closePath(); this.fillInk('#E5F6FF', 3); }
-        else { this.ellipse(0, 0, 26, 9); this.fillInk('#fff', 3); }
-        c.restore();
+    const c = this.ctx, gap = this.bandGap(), span = edgeX();
+    // Layers: each band a shade darker than the one above it
+    const shades = ['#5E4D83', '#544478', '#4A3B6D', '#433564', '#3C2F5B', '#362A53', '#30254B'];
+    for (let k = 0; k < shades.length; k++) {
+      c.beginPath(); c.moveTo(-900, this.faceY(-900, k)); c.lineTo(span + 200, this.faceY(span + 200, k));
+      c.lineTo(span + 200, this.faceY(span + 200, k + 1)); c.lineTo(-900, this.faceY(-900, k + 1)); c.closePath();
+      c.fillStyle = shades[k]; c.fill();
+      if (k) { c.beginPath(); c.moveTo(-900, this.faceY(-900, k)); c.lineTo(span + 200, this.faceY(span + 200, k)); c.lineWidth = 3; c.strokeStyle = 'rgba(36,21,46,.35)'; c.stroke(); }
+    }
+    // Shelves: short flat ledges sticking out of each layer line, every prop stands on one
+    const s = this.propScale(), stride = SW * (PORTRAIT ? 4.6 : 4.2);
+    const fallX = span * FALL.at, caveX = span * CAVE.at;
+    for (let band = 1; band <= 4; band++) {
+      for (let j = -1; j * stride < span; j++) {
+        const seed = band * 97 + j * 13;
+        if (hash(seed) < 0.4) continue;
+        const w = SW * (PORTRAIT ? 2.6 : 1.5) * (0.85 + hash(seed + 1) * 0.4);
+        const x0 = j * stride + hash(seed + 2) * stride * 0.4 + (band % 2) * stride * 0.5;
+        const xm = x0 + w / 2;
+        if (Math.abs(xm - fallX) < stride * 0.6 || (band === CAVE.band && Math.abs(xm - caveX) < stride)) continue;
+        const y = this.faceY(x0 + w, band);
+        this.shelf(x0, y, w);
+        const alt = Math.max(0, Math.min(1, xm / span));
+        this.prop(propFor(alt, hash(seed + 3)), xm + (hash(seed + 4) - 0.5) * w * 0.3, y, s);
       }
     }
-    // The cave: a dark mouth with two eyes that blink now and then
-    const cx = CAVE_STEP * SW + SW * 0.5, cy = stepTop(CAVE_STEP) + CAP + SH * (PORTRAIT ? 3.2 : 3.6), cs = k * 1.2;
-    c.save(); c.translate(cx, cy); c.scale(cs, cs);
-    c.beginPath(); c.moveTo(-30, 18); c.quadraticCurveTo(-32, -26, 0, -28); c.quadraticCurveTo(32, -26, 30, 18); c.closePath(); this.fillInk('#1E1530', 4);
-    if (Math.floor(this.clock / 2600) % 3 !== 0 && (this.clock % 2600) > 180) { this.ellipse(-7, -4, 3.5, 4); this.ellipse(7, -4, 3.5, 4); c.fillStyle = C.gold; c.fill(); }
+    this.drawCave(caveX, this.faceY(caveX + SW * 2, CAVE.band), s);
+    this.drawFall(fallX, s);
+  }
+  private shelf(x: number, y: number, w: number) {
+    // A chunky ledge: a lit top, a darker underside tapering back into the rock
+    const c = this.ctx, t = PORTRAIT ? 30 : 20;
+    c.beginPath(); c.moveTo(x - 4, y); c.lineTo(x + w + 4, y); c.lineTo(x + w - t * 0.5, y + t); c.lineTo(x + t * 0.5, y + t * 1.15); c.closePath();
+    this.fillInk('#7464A0', 3.5);
+    c.beginPath(); c.moveTo(x - 4, y); c.lineTo(x + w + 4, y); c.lineTo(x + w, y + t * 0.32); c.lineTo(x, y + t * 0.32); c.closePath();
+    this.fillInk('#A596CE', 3);
+  }
+  /** One prop standing on a shelf top at (x, y). */
+  private prop(kind: Prop, x: number, y: number, s: number) {
+    const c = this.ctx;
+    c.save(); c.translate(x, y); c.scale(s, s);
+    if (kind === 'pine' || kind === 'pines') {
+      const tree = (tx: number, h: number) => {
+        c.fillStyle = C.ink; c.fillRect(tx - 2, -6, 4, 6);
+        for (let t = 0; t < 3; t++) { c.beginPath(); c.moveTo(tx - 13 * h + t * 3 * h, -4 - t * 11 * h); c.lineTo(tx, -20 * h - t * 11 * h); c.lineTo(tx + 13 * h - t * 3 * h, -4 - t * 11 * h); c.closePath(); this.fillInk(C.grassD, 3); }
+      };
+      tree(0, 1);
+      if (kind === 'pines') { tree(-16, 0.7); tree(15, 0.8); }
+    } else if (kind === 'flowers') {
+      for (const [fx, col] of [[-10, '#FFC93C'], [0, '#fff'], [10, '#E2383F'], [5, '#fff']] as const) {
+        c.beginPath(); c.moveTo(fx, 0); c.lineTo(fx, -10); this.ink(2.5); this.ellipse(fx, -12, 4, 4); this.fillInk(col, 2);
+      }
+    } else if (kind === 'boulder') {
+      this.ellipse(0, -12, 20, 13); this.fillInk('#7E6CA6', 3.5);
+      this.ellipse(-6, -17, 7, 4); c.fillStyle = '#9A8BC2'; c.fill();
+    } else if (kind === 'crystal') {
+      c.beginPath(); c.moveTo(-12, 0); c.lineTo(-13, -14); c.lineTo(-7, -28); c.lineTo(-1, -14); c.lineTo(-2, 0); c.closePath(); this.fillInk('#BFE4F7', 3);
+      c.beginPath(); c.moveTo(-2, 0); c.lineTo(5, -20); c.lineTo(12, 0); c.closePath(); this.fillInk('#E5F6FF', 3);
+    } else if (kind === 'drift') {
+      c.beginPath(); c.moveTo(-26, 0); c.quadraticCurveTo(-18, -16, 0, -14); c.quadraticCurveTo(20, -18, 26, 0); c.closePath(); this.fillInk('#fff', 3);
+    }
     c.restore();
-    // The waterfall: a white ribbon with dashes sliding down it
-    const fx = FALL_STEP * SW + SW * 0.7, top = stepTop(FALL_STEP) + CAP * 0.6, len = SH * (PORTRAIT ? 4 : 5);
-    c.beginPath(); c.moveTo(fx - 8 * k, top); c.lineTo(fx + 8 * k, top); c.lineTo(fx + 12 * k, top + len); c.lineTo(fx - 12 * k, top + len); c.closePath(); this.fillInk('#BFE4F7', 3);
-    c.save(); c.clip(); c.strokeStyle = '#fff'; c.lineWidth = 3;
-    for (let d = 0; d < 6; d++) { const yy = top + ((this.clock * 0.12 + d * len / 6) % len); c.beginPath(); c.moveTo(fx - 3 * k, yy); c.lineTo(fx - 3 * k, yy + 14 * k); c.moveTo(fx + 4 * k, yy + 8 * k); c.lineTo(fx + 4 * k, yy + 20 * k); c.stroke(); }
+  }
+  /** A cave mouth sitting on its own shelf, with eyes that blink now and then. */
+  private drawCave(x: number, y: number, s: number) {
+    const c = this.ctx;
+    this.shelf(x - 40 * s, y, 80 * s);
+    c.save(); c.translate(x, y); c.scale(s, s);
+    c.beginPath(); c.moveTo(-28, 0); c.quadraticCurveTo(-30, -46, 0, -48); c.quadraticCurveTo(30, -46, 28, 0); c.closePath(); this.fillInk('#1E1530', 4);
+    if (Math.floor(this.clock / 2600) % 3 !== 0 && this.clock % 2600 > 180) { this.ellipse(-7, -22, 3.5, 4); this.ellipse(7, -22, 3.5, 4); c.fillStyle = C.gold; c.fill(); }
     c.restore();
-    this.ellipse(fx, top + len, 20 * k, 7 * k); this.fillInk('#fff', 3);
+  }
+  /** A waterfall from the ridge's lip down into a splash pool on a shelf one layer below. */
+  private drawFall(x: number, s: number) {
+    const c = this.ctx;
+    const step = Math.floor(x / SW);
+    const top = stepTop(step) + CAP * 0.6, bottom = this.faceY(x + SW, 1) ;
+    const w = 7 * s;
+    this.shelf(x - 26 * s, bottom, 52 * s);
+    c.beginPath(); c.moveTo(x - w, top); c.lineTo(x + w, top); c.lineTo(x + w * 1.4, bottom); c.lineTo(x - w * 1.4, bottom); c.closePath(); this.fillInk('#BFE4F7', 3);
+    c.save(); c.clip(); c.strokeStyle = '#fff'; c.lineWidth = 2 + s;
+    const len = bottom - top;
+    for (let d = 0; d < 6; d++) { const yy = top + ((this.clock * 0.12 + (d * len) / 6) % len); c.beginPath(); c.moveTo(x - w * 0.4, yy); c.lineTo(x - w * 0.4, yy + 12 * s); c.moveTo(x + w * 0.5, yy + 6 * s); c.lineTo(x + w * 0.5, yy + 18 * s); c.stroke(); }
+    c.restore();
+    this.ellipse(x, bottom - 2, 18 * s, 6 * s); this.fillInk('#fff', 3);
   }
 
   // ---------- the ridge ----------
@@ -483,8 +535,6 @@ export class Scene {
     stair(); c.lineTo(-900, 2400); c.closePath();
     c.fillStyle = C.mass; c.fill();
     c.save(); c.clip();
-    c.strokeStyle = C.massD; c.lineWidth = 6;
-    for (let k = 0; k < 40; k++) { const y = -1200 + k * 70; c.beginPath(); c.moveTo(-900, y + 300); c.lineTo(edgeX() + 100, y - 900); c.stroke(); }
     this.drawFace();
     c.restore();
     const cap = (x0: number, x1: number, top: number, i: number) => {

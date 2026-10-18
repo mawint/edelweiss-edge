@@ -382,6 +382,15 @@ async function replay() {
   }
 }
 
+// iOS Safari zooms on a double tap and a pinch even with user-scalable=no: cancel both (review item [223])
+let lastTouchEnd = 0;
+document.addEventListener('touchend', (e) => {
+  const now = performance.now();
+  if (now - lastTouchEnd < 320) e.preventDefault();
+  lastTouchEnd = now;
+}, { passive: false });
+for (const type of ['gesturestart', 'gesturechange']) document.addEventListener(type, (e) => e.preventDefault(), { passive: false });
+
 // QA hooks (qa/probes): the state, and the round and setup actions
 Object.assign(window, { game: { state, climb, syncControls, DIFFICULTIES } });
 void start();
