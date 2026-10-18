@@ -492,7 +492,7 @@ export class Scene {
     for (let r = Math.max(0, Math.floor((v.y0 - top) / R)); r <= rows; r++) {
       const y = top + r * R;
       // Brick-style offset per row, block widths varied but fixed for each spot
-      let x = -900 - hash(r * 7.3) * R;
+      let x = -3200 - hash(r * 7.3) * R;
       for (let j = 0; x < span + R; j++) {
         const seed = r * 131 + j * 17;
         const w = R * (1.1 + hash(seed) * 1.3);
@@ -570,11 +570,11 @@ export class Scene {
   private drawRidge() {
     const c = this.ctx;
     const stair = () => {
-      c.beginPath(); c.moveTo(-900, 0);
+      c.beginPath(); c.moveTo(-3200, 0);
       for (let i = 0; i <= TOP; i++) { c.lineTo(i * SW + this.jit(i), stepTop(i) + this.jit(i + 50)); c.lineTo((i + 1) * SW, stepTop(i) + this.jit(i + 99)); }
       c.lineTo(edgeX() + this.jit(7), 2400);
     };
-    stair(); c.lineTo(-900, 2400); c.closePath();
+    stair(); c.lineTo(-3200, 2400); c.closePath();
     c.fillStyle = C.mass; c.fill();
     c.save(); c.clip();
     this.drawFace();
@@ -590,7 +590,7 @@ export class Scene {
       c.closePath(); c.fillStyle = fill; c.fill(); this.ink(3);
       c.fillStyle = dark; c.fillRect(x0 + 3, top + CAP * 0.45, x1 - x0 - 6, 4);
     };
-    cap(-900, SW, 0, 0);
+    cap(-3200, SW, 0, 0);
     for (let i = 1; i <= TOP; i++) cap(i * SW, (i + 1) * SW, stepTop(i), i);
     stair(); this.ink(6);
     for (let i = 0; i <= TOP; i++) {

@@ -39,7 +39,7 @@ small { display: block; font-weight: 500; font-size: 11px; color: var(--muted); 
 /* ---------- the deck: menu, difficulty, bet, balance, Climb ---------- */
 .deck {
   position: absolute; left: 50%; bottom: max(10px, env(safe-area-inset-bottom)); translate: -50% 0;
-  width: min(760px, calc(100% - 20px));
+  width: min(760px, calc(100% - 20px - env(safe-area-inset-left) - env(safe-area-inset-right)));
   display: flex; align-items: center; gap: 10px;
   background: var(--cream); border: 4px solid var(--ink); border-radius: 18px; box-shadow: 0 6px 0 var(--ink);
   padding: 8px;
@@ -118,6 +118,20 @@ small { display: block; font-weight: 500; font-size: 11px; color: var(--muted); 
   .balance small { display: inline; }
   .balance b { font-size: 14px; }
   .go { order: 5; flex-basis: 100%; }
+}
+/* Phones on their side: one compact row so the mountain keeps most of the height */
+@media (max-height: 500px) and (min-width: 561px) {
+  .deck { width: min(820px, calc(100% - 20px - env(safe-area-inset-left) - env(safe-area-inset-right))); gap: 6px; padding: 5px; bottom: max(6px, env(safe-area-inset-bottom)); border-width: 3px; border-radius: 14px; box-shadow: 0 4px 0 var(--ink); }
+  button { min-height: 38px; font-size: 14px; border-width: 3px; box-shadow: 0 2px 0 var(--ink); border-radius: 10px; }
+  small { font-size: 10px; }
+  .pick { min-width: 6.5em; }
+  .pick b, .val b { font-size: 14px; }
+  .icon { width: 38px; font-size: 17px; }
+  .bet button { width: 34px; }
+  .val { min-width: 4.2em; }
+  .icon.side { width: 42px; font-size: 17px; }
+  .icon.side small { display: none; }
+  .climb { font-size: 22px; padding: 4px 12px 1px; border-width: 3px; box-shadow: 0 3px 0 var(--ink); }
 }
 /* Short screens (the 400×225 popout): one tight row, labels dropped */
 @media (max-height: 300px) {
