@@ -26,6 +26,7 @@ Before starting work, find out where things stand:
 - `node qa/probes/<probe>.mjs`: QA probes (see `qa/README.md`).
 
 ## Rules of thumb
+- The publisher is **Copperwick Studios** (`PUBLISHER` in `src/rules.ts`, used in the rules' "TM and ©" line, as in Thunder Push).
 - Never add money logic to the client: payouts come from book events (`src/book.ts`).
 - Player-facing text with bet/buy/pay words needs a social-casino version (`data-social` in `index.html`, `say()` in `src/main.ts`). `src/wording.test.ts` enforces it.
 - The screen: `src/scene.ts` draws the mountain on a canvas (alpine cartoon) and only animates what it's told; `src/director.ts` turns a book into scene beats; `src/sound.ts` synthesizes every sound behind one mute. Cosmetic randomness (weather, teases) is seeded from the book id so replays match. The rules screen is `src/rules.ts`, built from the exported numbers; its phrases go through `w(normal, social)`.

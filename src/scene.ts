@@ -661,9 +661,18 @@ export class Scene {
     y += bob;
     this.rrect(x, y, width, h, 16); this.fillInk(C.cream, 4);
     if (arrows) {
-      [[x + h / 2, '◀'], [x + width - h / 2, '▶']].forEach(([ax, glyph]) => {
-        this.ellipse(ax as number, y + h / 2, h / 2 - 7, h / 2 - 7); this.fillInk(C.gold, 3.5);
-        this.text(glyph as string, ax as number, y + h / 2 + 1, `700 20px ${FU}`, C.ink, 0);
+      // Drawn triangles, not ◀ ▶ characters: the font doesn't centre those glyphs. Each triangle is placed by
+      // its centroid, which is where it looks centred in the circle.
+      ([[x + h / 2, -1], [x + width - h / 2, 1]] as const).forEach(([ax, dir]) => {
+        const ay = y + h / 2, r = h / 2 - 7;
+        this.ellipse(ax, ay, r, r); this.fillInk(C.gold, 3.5);
+        const tw = r * 0.52, th = r * 0.58;
+        c.beginPath();
+        c.moveTo(ax + dir * (tw * 2 / 3), ay);
+        c.lineTo(ax - dir * (tw / 3), ay - th);
+        c.lineTo(ax - dir * (tw / 3), ay + th);
+        c.closePath();
+        c.fillStyle = C.ink; c.fill(); c.lineJoin = 'round'; c.lineWidth = 2; c.strokeStyle = C.ink; c.stroke();
       });
     }
     const mid = x + width / 2;

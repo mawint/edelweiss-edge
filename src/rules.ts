@@ -3,6 +3,9 @@
 // needs one goes through w(normal, social), and src/wording.test.ts renders the social version to check it.
 import { DIFFICULTIES, FIXTURES, startsFor, modeFor, type Difficulty } from './book';
 
+/** The publisher, for the rules' "TM and ©" line: the studio's legal name. */
+export const PUBLISHER = 'Copperwick Studios';
+
 const NAMES: Record<Difficulty, string> = { easy: 'Easy', medium: 'Medium', hard: 'Hard', pinpoint: 'Pinpoint' };
 
 /** The lowest and highest pay a difficulty offers, from the bottom of the ridge to the top. */
@@ -75,5 +78,5 @@ export function rulesHtml(social: boolean): string {
 </ul>
 
 <h3>Disclaimer</h3>
-<p>Malfunction voids all wins and plays. A consistent internet connection is required. In the event of a disconnection, reload the game to finish any uncompleted rounds. The expected return is calculated over many plays. The game display is not representative of any physical device and is for illustrative purposes only. Winnings are settled according to the amount received from the Remote Game Server and not from events within the web browser. TM and © 2026 Engine.</p>`;
+<p>Malfunction voids all wins and plays. A consistent internet connection is required. In the event of a disconnection, reload the game to finish any uncompleted rounds. The expected return is calculated over many plays. The game display is not representative of any physical device and is for illustrative purposes only. Winnings are settled according to the amount received from the Remote Game Server and not from events within the web browser. TM and © ${new Date().getFullYear()} ${PUBLISHER}.</p>`;
 }

@@ -43,7 +43,7 @@ describe('social-casino wording', () => {
 
   it('states the RTP, the maximum win, every mode, the controls and the disclaimer', () => {
     const text = rulesHtml(false);
-    for (const want of ['RTP: 96.50% in every mode', 'Maximum win: 5,000×', 'Easy', 'Medium', 'Hard', 'Pinpoint', 'Over the Edge', 'Menu (☰)', 'Turbo (»)', 'Autoplay (↻)', 'Sound', 'Malfunction voids all wins and plays']) {
+    for (const want of ['RTP: 96.50% in every mode', 'Maximum win: 5,000×', 'Easy', 'Medium', 'Hard', 'Pinpoint', 'Over the Edge', 'Menu (☰)', 'Turbo (»)', 'Autoplay (↻)', 'Sound', 'Malfunction voids all wins and plays', `TM and © ${new Date().getFullYear()} Copperwick Studios`]) {
       expect(text).toContain(want);
     }
   });

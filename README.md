@@ -1,5 +1,7 @@
 # Edelweiss Edge (working title)
 
+Published by **Copperwick Studios**.
+
 An alpine climbing game for Stake Engine. Ueli, a yodeler with an alphorn, climbs a 25-step ridge in three climbs. Before he sets off you place a window on the ridge, and you win if he stops inside it. The higher the window, the rarer the stop and the bigger the pay. Gondola lifts, avalanches, alphorn echoes and the föhn wind move him along the way. Edelweiss blooms multiply the win, and past step 25 he goes over the edge. The repo was set up from Thunder Push's.
 
 - Design: [docs/GAME_DESIGN.md](docs/GAME_DESIGN.md)
