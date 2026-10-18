@@ -69,7 +69,7 @@ export async function stageRound(book: Book, scene: Scene, o: StageOptions): Pro
       switch (e.type) {
         case 'climb': {
           if (e.n > 1 && rng() < 0.2) await scene.tease();
-          await scene.spinCounter(`CLIMB ${e.n} OF 3`, e.steps);
+          await scene.spinCounter(e.n, e.steps);
           if (e.steps === 0) { say(`Climb ${e.n} of 3: he stops to yodel.`); await scene.yodel(); await scene.hideCounter(); break; }
           say(`Climb ${e.n} of 3: ${e.steps} step${e.steps > 1 ? 's' : ''}.`);
           await scene.walk(Math.min(e.to, TOP), { count: true, final: i === lastClimb, onLand: reach });

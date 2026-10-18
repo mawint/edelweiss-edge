@@ -119,7 +119,7 @@ export class Scene {
   private win: { text: string; sub: string; amount: number; shown: number; format: (v: number) => string } | null = null;
   private flyers: Flyer[] = [];
   /** The step counter: spins to a climb's step count, then counts down as he walks. */
-  private reel: { title: string; pos: number; target: number; remaining: number | null; alpha: number; pulse: number; note: string } | null = null;
+  private reel: { climb: number | 'echo'; pos: number; target: number; remaining: number | null; alpha: number; drop: number; swing: number; note: string } | null = null;
   private wipe: { t: number; swapped: boolean; swap: () => void; done: () => void } | null = null;
   private nextFlyer = 1500;
 
@@ -1030,7 +1030,7 @@ export class Scene {
       const target = this.u.step + dir;
       const tense = !!o.final && (this.inWindow(target) !== this.inWindow(this.u.step) || target >= TOP - 1 || (this.window === 'edge' && target >= TOP - 2));
       this.tense(tense);
-      if (o.count && this.reel?.remaining) { this.reel.remaining--; this.reel.pulse = 1; void this.tween(200, (p) => { if (this.reel) this.reel.pulse = 1 - p; }); }
+      if (o.count) this.countStep();
       await this.hop(target, { ring: o.count ? ++k : 0, dur: tense ? 420 : o.dur ?? 280, height: dir < 0 ? 22 : 36, onLand: o.onLand });
       if (target >= TOP - 1) this.burst(this.u.x + 40, this.u.y, 4, 'pebble', { speed: 120, angle: 0.3, spread: 1, size: 7, life: 1200 });
       await this.sleep(tense ? 220 : 90);
@@ -1039,13 +1039,15 @@ export class Scene {
   }
 
   /**
-   * Spin the step counter and stop it on `steps`: a few loops through 0-9 that slow down and lock on, so the
-   * player sees how far this climb goes before he moves. It then counts down as he walks (see walk()).
+   * Spin the step counter and stop it on `steps`: a cowbell drops in on its strap, the reel on its face runs
+   * a few loops through 0-9, slows and locks on, and the bell swings. Then it counts down as he walks (walk()).
+   * `climb` is which climb this is (1-3), or 'echo' for the Alphorn Echo's replay.
    */
-  async spinCounter(title: string, steps: number) {
-    const r = { title, pos: 0, target: steps, remaining: null as number | null, alpha: 0, pulse: 0, note: '' };
+  async spinCounter(climb: number | 'echo', steps: number) {
+    const r = { climb, pos: 0, target: steps, remaining: null as number | null, alpha: 1, drop: 0, swing: 0, note: '' };
     this.reel = r;
-    void this.tween(180, (p) => { r.alpha = p; });
+    play('whoosh');
+    await this.tween(this.reduce ? 1 : 320, (p) => { r.drop = p; }, backOut);
     if (this.reduce) { r.pos = steps; } else {
       const loops = this.speed > 1 ? 10 : 20, dist = loops + steps;
       let last = -1;
@@ -1056,39 +1058,92 @@ export class Scene {
       });
       r.pos = dist;
     }
-    play('clunk'); r.pulse = 1; void this.tween(300, (p) => { r.pulse = 1 - p; });
+    play('clunk'); play('bell', 0.8);
+    r.swing = this.reduce ? 0 : 1;
     r.remaining = steps;
-    r.note = steps === 0 ? 'Yodel break!' : steps === 1 ? 'step' : 'steps';
-    await this.sleep(450);
+    r.note = steps === 0 ? 'Yodel break!' : steps === 1 ? 'step to go' : 'steps to go';
+    await this.sleep(500);
   }
-  /** Fade the counter away once the climb is done. */
+  /** The bell rises back out of view once the climb is done. */
   async hideCounter() {
     const r = this.reel;
     if (!r) return;
-    await this.tween(250, (p) => { r.alpha = 1 - p; });
+    await this.tween(260, (p) => { r.drop = 1 - p; });
     if (this.reel === r) this.reel = null;
   }
+  /** One step counted off: the number drops and the bell gives a small wobble. */
+  private countStep() {
+    const r = this.reel;
+    if (!r?.remaining) return;
+    r.remaining--;
+    r.swing = Math.max(r.swing, this.reduce ? 0 : 0.45);
+    if (r.remaining === 0) r.note = 'here we go…';
+    else r.note = r.remaining === 1 ? 'step to go' : 'steps to go';
+  }
+
   private drawCounter() {
     const r = this.reel;
-    if (!r || r.alpha <= 0) return;
-    const c = this.ctx, w = 190, h = 128, x = this.W / 2 - w / 2, y = this.inset.top + 50;
-    const s = 1 + r.pulse * 0.08;
-    c.save(); c.globalAlpha = r.alpha; c.translate(this.W / 2, y + h / 2); c.scale(s, s); c.translate(-this.W / 2, -(y + h / 2));
-    this.rrect(x, y, w, h, 18); this.fillInk(C.cream, 4);
-    this.text(r.title, this.W / 2, y + 18, `20px ${FD}`, C.red, 0);
-    // The digit window: digits scroll up through it while spinning
-    const wx = this.W / 2 - 34, wy = y + 32, ww = 68, wh = 64;
-    this.rrect(wx, wy, ww, wh, 10); this.fillInk(C.ink, 3);
-    c.save(); c.beginPath(); c.roundRect(wx + 3, wy + 3, ww - 6, wh - 6, 8); c.clip();
-    const shown = r.remaining ?? Math.floor(r.pos) % 10;
-    const frac = r.remaining === null ? r.pos - Math.floor(r.pos) : 0;
-    for (const [digit, off] of [[shown, 0], [(shown + 1) % 10, 1]] as const) {
-      this.text(String(digit), this.W / 2, wy + wh / 2 + 4 + (off - frac) * wh, `52px ${FD}`, C.gold, 0);
+    if (!r || r.drop <= 0) return;
+    const c = this.ctx, t = this.clock;
+    r.swing *= 0.985;
+    // (hung just under the altitude bar, so the strap doesn't cover it)
+    const cx = this.W / 2, hang = this.inset.top + 68;
+    const y0 = hang - 230 * (1 - r.drop);
+    const angle = r.swing * Math.sin(t / 110) * 0.22;
+    c.save(); c.translate(cx, y0); c.rotate(angle);
+    // Strap: red with white stitching, and the climb pips (or ECHO) on a little plaque
+    this.rrect(-13, -20, 26, 58, 6); this.fillInk(C.red, 4);
+    c.setLineDash([5, 5]); c.beginPath(); c.moveTo(-6, -16); c.lineTo(-6, 34); c.moveTo(6, -16); c.lineTo(6, 34); c.lineWidth = 2; c.strokeStyle = '#fff'; c.stroke(); c.setLineDash([]);
+    this.rrect(-48, 4, 96, 26, 13); this.fillInk(C.cream, 3.5);
+    if (r.climb === 'echo') this.text('ECHO', 0, 18, `18px ${FD}`, C.red, 0);
+    else for (let i = 1; i <= 3; i++) {
+      const px = (i - 2) * 26;
+      this.ellipse(px, 17, i === r.climb ? 8 : 6.5, i === r.climb ? 8 : 6.5);
+      this.fillInk(i < r.climb ? C.gold : i === r.climb ? C.red : '#fff', 3);
     }
+    // The bell: flared gold body, shaded on one side, a highlight on the other
+    const body = () => {
+      c.beginPath(); c.moveTo(-34, 40); c.quadraticCurveTo(0, 30, 34, 40);
+      c.bezierCurveTo(44, 90, 50, 130, 70, 150); c.lineTo(-70, 150); c.bezierCurveTo(-50, 130, -44, 90, -34, 40); c.closePath();
+    };
+    body(); c.fillStyle = C.gold; c.fill();
+    c.save(); body(); c.clip(); c.fillStyle = '#E3A928'; c.fillRect(22, 30, 60, 130); c.restore();
+    body(); this.ink(5);
+    c.beginPath(); c.moveTo(-24, 52); c.quadraticCurveTo(-34, 100, -50, 136); c.lineWidth = 5; c.strokeStyle = 'rgba(255,255,255,.55)'; c.stroke();
+    this.ellipse(0, 150, 72, 12); this.fillInk('#D99A1E', 4);
+    // Clapper, swinging a little behind the bell's own swing
+    const clap = Math.sin(t / 110 - 0.8) * r.swing * 10;
+    this.ellipse(clap, 166, 11, 11); this.fillInk('#8E5A2C', 3.5);
+    // The reel window: neighbouring digits scroll past, shaded top and bottom like a drum
+    const wx = -36, wy = 62, ww = 72, wh = 74;
+    this.rrect(wx, wy, ww, wh, 14); this.fillInk(C.cream, 4);
+    c.save(); c.beginPath(); c.roundRect(wx + 3, wy + 3, ww - 6, wh - 6, 11); c.clip();
+    const pos = r.remaining ?? r.pos;
+    const base = Math.floor(pos), frac = r.remaining === null ? pos - base : 0;
+    for (let k = -1; k <= 2; k++) {
+      const digit = (((base + k) % 10) + 10) % 10;
+      const y = wy + wh / 2 + 4 + (k - frac) * 58;
+      c.globalAlpha = k === 0 && frac < 0.5 ? 1 : k === 1 && frac >= 0.5 ? 1 : 0.35;
+      this.text(String(digit), 0, y, `56px ${FD}`, r.remaining === 0 && k === 0 ? C.red : C.ink, 0);
+    }
+    c.globalAlpha = 1;
+    const shade = c.createLinearGradient(0, wy, 0, wy + wh);
+    shade.addColorStop(0, 'rgba(36,21,46,.45)'); shade.addColorStop(0.3, 'rgba(36,21,46,0)'); shade.addColorStop(0.7, 'rgba(36,21,46,0)'); shade.addColorStop(1, 'rgba(36,21,46,.45)');
+    c.fillStyle = shade; c.fillRect(wx, wy, ww, wh);
     c.restore();
-    if (r.note) this.text(r.note, this.W / 2, y + h - 14, `800 15px ${FU}`, C.ink, 0);
+    this.rrect(wx, wy, ww, wh, 14); this.ink(4);
+    // A red pointer on each side of the window marks the line the reel stops on
+    for (const sx of [-1, 1]) { c.beginPath(); c.moveTo(sx * 46, wy + wh / 2 - 7); c.lineTo(sx * 38, wy + wh / 2); c.lineTo(sx * 46, wy + wh / 2 + 7); c.closePath(); this.fillInk(C.red, 2.5); }
     c.restore();
+    // The label hangs still under the bell
+    if (r.note && r.drop > 0.9) {
+      c.font = `800 17px ${FU}`;
+      const w = c.measureText(r.note).width + 26, ly = y0 + 196;
+      this.rrect(cx - w / 2, ly - 15, w, 30, 15); this.fillInk(C.ink, 0);
+      this.text(r.note, cx, ly + 1, `800 17px ${FU}`, C.cream, 0);
+    }
   }
+
 
   async yodel() {
     const u = this.u;
@@ -1175,7 +1230,7 @@ export class Scene {
     await this.tween(1300, (p) => rings.forEach((r) => { const q = Math.max(0, p * 1.4 - r.k * 0.12); r.r = 10 + q * 700; r.a = Math.max(0, 1 - q); }));
     this.rings = [];
     u.horn = 0; u.face = 'happy';
-    await this.spinCounter('ECHO', to - u.step);
+    await this.spinCounter('echo', to - u.step);
     await this.walk(Math.min(to, TOP), { count: true, final: true, onLand });
     await this.hideCounter();
   }
