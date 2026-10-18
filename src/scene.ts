@@ -16,6 +16,8 @@ const stepTop = (i: number) => -Math.max(0, Math.min(i, TOP)) * SH;
 const stand = (i: number) => (i > TOP ? { x: edgeX() + 50, y: stepTop(TOP) } : { x: i * SW + SW * 0.35, y: stepTop(i) });
 /** Phones: narrow steps so the whole ridge fits between rounds, twice as wide once the camera zooms in on the climb. */
 const PORTRAIT_SW = { overview: 58, climb: 116 };
+/** The cloud wipe's timing (ms): sweep in, hold while the ridge and camera swap, sweep out. */
+const WIPE = { cover: 380, hold: 120, reveal: 420 };
 const topAtX = (x: number) => stepTop(Math.max(0, Math.min(TOP, Math.floor(x / SW))));
 /** The whole ridge, flags included, for the overview camera. */
 const ridge = () =>
@@ -116,6 +118,7 @@ export class Scene {
   private marmot: { x: number; y: number; up: number } | null = null;
   private win: { text: string; sub: string; amount: number; shown: number; format: (v: number) => string } | null = null;
   private flyers: Flyer[] = [];
+  private wipe: { t: number; swapped: boolean; swap: () => void; done: () => void } | null = null;
   private nextFlyer = 1500;
 
   /** Dragging the window on the mountain: called with the step under the pointer. */
@@ -239,24 +242,12 @@ export class Scene {
     this.scale += (this.scaleTarget - this.scale) * Math.min(1, dt * 0.006);
     this.tension += (this.tensionTarget - this.tension) * Math.min(1, dt * 0.005);
     const u = this.u;
-    // On phones the ridge stretches while the camera swoops in (and back as it pulls out); Ueli is standing
-    // still at those moments, so he just moves with his step
-    if (PORTRAIT) {
-      const want = this.mode === 'overview' ? PORTRAIT_SW.overview : PORTRAIT_SW.climb;
-      if (Math.abs(SW - want) > 0.05) {
-        SW += (want - SW) * (1 - Math.exp(-dt * 0.004));
-        if (u.pose === 'idle' && u.step <= TOP) { const p = stand(u.step); u.x = p.x; u.y = p.y; }
-      } else SW = want;
+    if (this.wipe) {
+      this.wipe.t += dt;
+      if (!this.wipe.swapped && this.wipe.t >= WIPE.cover) { this.wipe.swapped = true; this.wipe.swap(); }
+      if (this.wipe.t >= WIPE.cover + WIPE.hold + WIPE.reveal) { this.wipe.done(); this.wipe = null; }
     }
-    let t;
-    if (this.mode === 'overview') t = this.overview();
-    else if (this.mode === 'fall') t = { x: u.x - 40, y: u.y - 90, z: 0.85 };
-    else {
-      const z = lerp(1.05, 1.45, this.tension) * (PORTRAIT ? 1 : Math.min(1, this.W / 700));
-      // Look ahead, up the ridge: sideways in landscape, upward in portrait where the ridge climbs the screen
-      const ahead = PORTRAIT ? { x: 60, y: (this.H - this.inset.top - this.inset.bottom) * 0.2 } : { x: 120, y: 100 };
-      t = { x: u.x + ahead.x / z, y: u.y - ahead.y / z + ((this.inset.bottom - this.inset.top) / 2) / z, z };
-    }
+    const t = this.camTarget();
     // Follow tighter than the overview swoop, so fast moves (gondola, echo) never leave him off screen
     const stiff = this.mode === 'overview' ? 0.0045 : 0.009;
     const k = 1 - Math.exp(-dt * stiff * this.speed), kz = 1 - Math.exp(-dt * 0.0032 * this.speed);
@@ -295,6 +286,57 @@ export class Scene {
       f.t += dt; f.x += (f.vx * dt) / 1000; f.y += (f.vy * dt) / 1000;
       if (f.x < -300 || f.x > this.W + 300) this.flyers.splice(i, 1);
     }
+  }
+
+  /** Where the camera wants to be for the current mode. */
+  private camTarget() {
+    const u = this.u;
+    if (this.mode === 'overview') return this.overview();
+    if (this.mode === 'fall') return { x: u.x - 40, y: u.y - 90, z: 0.85 };
+    const z = lerp(1.05, 1.45, this.tension) * (PORTRAIT ? 1 : Math.min(1, this.W / 700));
+    // Look ahead, up the ridge: sideways in landscape, upward in portrait where the ridge climbs the screen
+    const ahead = PORTRAIT ? { x: 60, y: (this.H - this.inset.top - this.inset.bottom) * 0.2 } : { x: 120, y: 100 };
+    return { x: u.x + ahead.x / z, y: u.y - ahead.y / z + ((this.inset.bottom - this.inset.top) / 2) / z, z };
+  }
+
+  /**
+   * Change camera mode. On phones the climb uses wider steps than the overview; stretching the ridge in view
+   * made the whole mountain slide, so the swap happens under a cartoon cloud wipe instead, with the camera
+   * cut to its new spot while the screen is covered.
+   */
+  async switchView(mode: 'overview' | 'follow' | 'fall') {
+    const want = !PORTRAIT ? SW : mode === 'overview' ? PORTRAIT_SW.overview : PORTRAIT_SW.climb;
+    if (want === SW) { this.mode = mode; return; }
+    const swap = () => {
+      this.mode = mode;
+      SW = want;
+      const u = this.u;
+      if (u.step <= TOP) { const p = stand(u.step); u.x = p.x; u.y = p.y; } else u.x = edgeX() + 90;
+      this.cam = { ...this.camTarget() };
+    };
+    if (this.reduce) { swap(); return; }
+    play('whoosh');
+    await new Promise<void>((done) => { this.wipe = { t: 0, swapped: false, swap, done }; });
+  }
+  private drawWipe() {
+    const w = this.wipe;
+    if (!w) return;
+    const c = this.ctx, { W, H } = this;
+    // Covering: the cloud bank's edge sweeps left to right; revealing: its trailing edge follows it off
+    const inP = Math.min(1, w.t / WIPE.cover), outP = Math.max(0, (w.t - WIPE.cover - WIPE.hold) / WIPE.reveal);
+    const lead = lerp(-120, W + 120, easeInOut(inP)), trail = lerp(-120, W + 120, easeInOut(outP));
+    if (lead <= trail) return;
+    const R = 70;
+    c.fillStyle = C.cream; c.fillRect(trail, -10, lead - trail, H + 20);
+    for (const [x, dir] of [[lead, 1], [trail, -1]] as const) {
+      if (x <= -100 || x >= W + 100) continue;
+      for (let y = -R; y < H + R; y += R * 1.1) {
+        const bx = x + dir * (Math.sin(y * 0.05) * 16), by = y;
+        this.ellipse(bx, by, R, R * 0.9); c.lineWidth = 8; c.strokeStyle = C.ink; c.stroke();
+      }
+      for (let y = -R; y < H + R; y += R * 1.1) { this.ellipse(x + dir * (Math.sin(y * 0.05) * 16), y, R, R * 0.9); c.fillStyle = C.cream; c.fill(); }
+    }
+    c.fillStyle = C.cream; c.fillRect(Math.max(trail, trail + R * 0.6), -10, Math.max(0, lead - trail - R * 1.2), H + 20);
   }
 
   // ---------- drawing helpers ----------
@@ -893,6 +935,7 @@ export class Scene {
     this.drawMinimap();
     this.drawCards();
     this.drawWin();
+    this.drawWipe();
     c.restore();
     if (this.flash > 0) { c.fillStyle = `rgba(255,255,255,${this.flash * 0.8})`; c.fillRect(0, 0, this.W, this.H); }
   }
@@ -931,6 +974,8 @@ export class Scene {
     this.cabin = null; this.balls = []; this.dog = null; this.rope = false; this.rings = []; this.wind = 0; this.marmot = null;
     this.tense(false);
     this.mode = 'overview';
+    if (PORTRAIT) SW = PORTRAIT_SW.overview;
+    const p = stand(0); this.u.x = p.x; this.u.y = p.y;
   }
   /** Skip straight to where a round ended (resuming after a reload). */
   placeAt(step: number) { const p = stand(Math.min(step, TOP)); Object.assign(this.u, { x: p.x, y: p.y, step: Math.min(step, TOP), rot: 0 }); }
@@ -938,7 +983,7 @@ export class Scene {
   async intro(hidden: number, label: string) {
     this.card(label.toUpperCase(), hidden ? `${hidden} edelweiss hidden on the ridge` : 'Climb clean', C.cream, { size: 64, big: false, dur: 1400 });
     await this.sleep(1300);
-    this.mode = 'follow';
+    await this.switchView('follow');
     await this.sleep(900);
   }
 
@@ -1128,7 +1173,7 @@ export class Scene {
 
   async won(title: string, sub: string, amount: number, format: (v: number) => string) {
     this.tense(false);
-    this.mode = 'overview';
+    await this.switchView('overview');
     await this.sleep(1100);
     this.win = { text: title, sub, amount, shown: 0, format };
     this.card('JUHUI!', '', C.gold, { dur: 3200 });
@@ -1140,7 +1185,7 @@ export class Scene {
 
   async lost(sub: string) {
     this.tense(false);
-    this.mode = 'overview';
+    await this.switchView('overview');
     await this.sleep(1100);
     this.card('OH NEI…', sub, C.cream, { size: 72, big: false, dur: 2000 });
     play('sad');
@@ -1149,5 +1194,8 @@ export class Scene {
   }
 
   /** Back to the overview between rounds; the last win stays up until the next climb. */
-  idle() { this.tense(false); this.mode = 'overview'; this.u.face = 'happy'; this.u.pose = 'idle'; }
+  idle() {
+    this.tense(false); this.u.face = 'happy'; this.u.pose = 'idle';
+    if (this.mode !== 'overview') void this.switchView('overview');
+  }
 }
