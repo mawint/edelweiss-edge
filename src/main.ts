@@ -5,6 +5,7 @@ import './style.css';
 import { DIFFICULTIES, FIXTURES, modeFor, startsFor, type BetMode, type ClimbPlan, type Difficulty } from './book';
 import { stageRound } from './director';
 import { Scene } from './scene';
+import { payRange, rulesHtml, widthOf } from './rules';
 import { setSound, soundOn, unlockSound } from './sound';
 import { MICRO, RgsError, fetchReplay, formatMoney, httpRgs, readLaunch, type Rgs, type RgsRound } from './rgs';
 import { demoRgs } from './rgs-mock';
@@ -103,64 +104,93 @@ function currentMode(): BetMode {
   if (state.difficulty === 'edge') return 'edge';
   return modeFor(state.difficulty, state.from)!;
 }
-const widthOf = (d: Difficulty) => {
-  const [a, b] = FIXTURES.modes[modeFor(d, startsFor(d)[0])!].window as [number, number];
-  return b - a + 1;
-};
+const NAMES: Record<Choice, string> = { easy: 'Easy', medium: 'Medium', hard: 'Hard', pinpoint: 'Pinpoint', edge: 'Over the Edge' };
+const oneIn = (mode: BetMode) => (1 / (1 - (FIXTURES.modes[mode].kinds.loss ?? 0))).toFixed(1);
 
 /** Move the window so it starts on `from`, clamped to the starts this difficulty offers. */
 function moveWindow(from: number) {
-  if (state.difficulty === 'edge' || state.phase !== 'idle') return;
-  const starts = startsFor(state.difficulty);
-  state.from = Math.min(Math.max(from, starts[0]), starts[starts.length - 1]);
+  if (state.difficulty === 'edge' || state.phase !== 'idle' || anySheetOpen()) return;
+  state.from = from;
   syncControls();
+}
+function clampWindow() {
+  if (state.difficulty === 'edge') return;
+  const starts = startsFor(state.difficulty);
+  state.from = Math.min(Math.max(state.from, starts[0]), starts[starts.length - 1]);
 }
 
 // ---------- controls ----------
 function syncControls() {
-  for (const b of document.querySelectorAll<HTMLButtonElement>('[data-difficulty]')) {
-    b.setAttribute('aria-pressed', String(b.dataset.difficulty === state.difficulty));
-  }
-  const edge = state.difficulty === 'edge';
-  if (!edge) moveWindowClamp();
-  const mode = FIXTURES.modes[currentMode()];
-  const win = mode.window;
-  scene.setWindow(win === 'edge' ? 'edge' : { from: win[0], to: win[1] });
-  $('window-label').textContent = win === 'edge' ? 'Over the edge' : win[0] === win[1] ? `Step ${win[0]}` : `Steps ${win[0]}–${win[1]}`;
-  $('window-alt').textContent = win === 'edge' ? 'past 3’000 m' : win[0] === win[1] ? metres(win[0]) : `${metres(win[0])}–${metres(win[1])}`;
-  $('pays').textContent = `${mode.pay.toFixed(1)}×`;
-  $('pays').setAttribute('aria-label', say(`Pays ${mode.pay} times the bet`, `Wins ${mode.pay} times the play amount`));
-  $('chance').textContent = `wins 1 in ${(1 / (1 - (mode.kinds.loss ?? 0))).toFixed(1)}`;
+  clampWindow();
+  const mode = currentMode();
+  const m = FIXTURES.modes[mode];
+  const win = m.window;
+  const where = win === 'edge' ? 'over the edge' : win[0] === win[1] ? `step ${win[0]} (${metres(win[0])})` : `steps ${win[0]} to ${win[1]} (${metres(win[0])} to ${metres(win[1])})`;
+  scene.setWindow(win === 'edge' ? 'edge' : { from: win[0], to: win[1] }, { pay: `${m.pay.toFixed(1)}×`, odds: `wins 1 in ${oneIn(mode)}` });
+  $('scene').setAttribute('aria-label', say(`Your window: ${where}. Pays ${m.pay.toFixed(1)} times the bet, wins 1 in ${oneIn(mode)}. Drag the sign over it, or use the arrow keys, to move it.`, `Your window: ${where}. Wins ${m.pay.toFixed(1)} times the play amount, 1 in ${oneIn(mode)}. Drag the sign over it, or use the arrow keys, to move it.`));
+  $('diff-label').textContent = NAMES[state.difficulty];
   $('bet').textContent = money(state.bet);
   $('balance').textContent = money(state.balance);
   const busy = state.phase !== 'idle' || !state.ready;
-  for (const b of document.querySelectorAll<HTMLButtonElement>('.deck button')) b.disabled = busy && b.id !== 'sound';
-  for (const id of ['nudge-down', 'nudge-up']) $<HTMLButtonElement>(id).disabled = busy || edge;
-  scene.dragEnabled = !busy && !edge;
+  for (const b of document.querySelectorAll<HTMLButtonElement>('.deck button')) b.disabled = busy && b.id !== 'menu-open';
+  scene.dragEnabled = !busy && state.difficulty !== 'edge';
 }
-function moveWindowClamp() {
-  const starts = startsFor(state.difficulty as Difficulty);
-  state.from = Math.min(Math.max(state.from, starts[0]), starts[starts.length - 1]);
+
+/** The difficulty sheet: each choice with its window width and what it pays from the bottom to the top. */
+function renderDifficulties() {
+  const list = $('diff-list');
+  const choices: Choice[] = [...DIFFICULTIES, 'edge'];
+  list.innerHTML = choices
+    .map((d) => {
+      const detail = d === 'edge' ? 'He falls past step 25' : `${widthOf(d)} step${widthOf(d) > 1 ? 's' : ''} wide`;
+      const range = d === 'edge' ? `${FIXTURES.modes.edge.pay.toFixed(1)}×` : payRange(d).map((v) => `${v.toFixed(1)}×`).join(' – ');
+      return `<button type="button" class="choice${d === 'edge' ? ' edge' : ''}" data-difficulty="${d}" aria-pressed="${d === state.difficulty}"><b>${NAMES[d]}</b><span class="range">${range}</span><small>${detail}</small></button>`;
+    })
+    .join('');
+}
+
+const anySheetOpen = () => !!document.querySelector('dialog[open]');
+function openSheet(id: string) {
+  const d = $<HTMLDialogElement>(id);
+  if (id === 'diff-sheet') renderDifficulties();
+  if (id === 'menu-sheet') $('rules').innerHTML = rulesHtml(social);
+  d.showModal();
+}
+
+const TURBO_KEY = 'edelweiss.turbo';
+function readTurbo() {
+  try {
+    return localStorage.getItem(TURBO_KEY) === 'on';
+  } catch {
+    return false;
+  }
 }
 
 function wireControls() {
-  for (const b of document.querySelectorAll<HTMLButtonElement>('[data-difficulty]')) {
-    b.addEventListener('click', () => {
-      // Keep the window centred on the same spot when its width changes
-      const oldWidth = state.difficulty === 'edge' ? 1 : widthOf(state.difficulty);
-      const centre = state.from + (oldWidth - 1) / 2;
-      state.difficulty = b.dataset.difficulty as Choice;
-      if (state.difficulty !== 'edge') state.from = Math.round(centre - (widthOf(state.difficulty) - 1) / 2);
-      syncControls();
-    });
+  $('diff-open').addEventListener('click', () => openSheet('diff-sheet'));
+  $('menu-open').addEventListener('click', () => openSheet('menu-sheet'));
+  for (const d of document.querySelectorAll<HTMLDialogElement>('dialog')) {
+    d.querySelector('.close')!.addEventListener('click', () => d.close());
+    // (a tap on the backdrop closes it too)
+    d.addEventListener('click', (e) => { if (e.target === d) d.close(); });
   }
-  $('nudge-down').addEventListener('click', () => moveWindow(state.from - 1));
-  $('nudge-up').addEventListener('click', () => moveWindow(state.from + 1));
-  // Dragging on the mountain centres the window on the step under the pointer
+  $('diff-list').addEventListener('click', (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-difficulty]');
+    if (!b || state.phase !== 'idle') return;
+    // Keep the window centred on the same spot when its width changes
+    const oldWidth = state.difficulty === 'edge' ? 1 : widthOf(state.difficulty);
+    const centre = state.from + (oldWidth - 1) / 2;
+    state.difficulty = b.dataset.difficulty as Choice;
+    if (state.difficulty !== 'edge') state.from = Math.round(centre - (widthOf(state.difficulty) - 1) / 2);
+    syncControls();
+    $<HTMLDialogElement>('diff-sheet').close();
+  });
+  // The window moves on the mountain: drag anywhere (it centres on the step under the pointer), or tap the sign's arrows
   scene.onDrag = (step) => {
     if (state.difficulty === 'edge') return;
     moveWindow(step - Math.floor((widthOf(state.difficulty) - 1) / 2));
   };
+  scene.onNudge = (dir) => moveWindow(state.from + dir);
   const stepBet = (dir: number) => {
     const i = state.betLevels.indexOf(state.bet);
     state.bet = state.betLevels[Math.min(state.betLevels.length - 1, Math.max(0, i + dir))] ?? state.bet;
@@ -169,13 +199,28 @@ function wireControls() {
   $('bet-down').addEventListener('click', () => stepBet(-1));
   $('bet-up').addEventListener('click', () => stepBet(1));
   $('climb').addEventListener('click', () => void climb());
+
   const sound = $<HTMLButtonElement>('sound');
-  const showSound = () => { sound.setAttribute('aria-pressed', String(soundOn())); sound.textContent = soundOn() ? 'Sound on' : 'Sound off'; };
+  const showSound = () => { sound.setAttribute('aria-pressed', String(soundOn())); sound.querySelector('b')!.textContent = soundOn() ? 'On' : 'Off'; };
   sound.addEventListener('click', () => { setSound(!soundOn()); showSound(); });
   showSound();
-  // Review item [228]: space does what Climb does; arrows are the keyboard backup for dragging
+  const turbo = $<HTMLButtonElement>('turbo');
+  const showTurbo = () => { const on = scene.speed > 1; turbo.setAttribute('aria-pressed', String(on)); turbo.querySelector('b')!.textContent = on ? 'On' : 'Off'; };
+  scene.speed = readTurbo() ? 2 : 1;
+  turbo.addEventListener('click', () => {
+    scene.speed = scene.speed > 1 ? 1 : 2;
+    try {
+      localStorage.setItem(TURBO_KEY, scene.speed > 1 ? 'on' : 'off');
+    } catch {
+      /* the setting just won't persist */
+    }
+    showTurbo();
+  });
+  showTurbo();
+
+  // Review item [228]: space does what Climb does, but never while a menu is open; arrows move the window
   window.addEventListener('keydown', (e) => {
-    if (e.target instanceof HTMLInputElement) return;
+    if (anySheetOpen()) return;
     if (e.code === 'Space') {
       e.preventDefault();
       if (!(e.target instanceof HTMLButtonElement) || e.target.id === 'climb') void climb();
@@ -186,10 +231,7 @@ function wireControls() {
   });
   // The scene frames the ridge above the deck, whatever size the deck wraps to
   const deck = $('deck');
-  const inset = () => {
-    const r = deck.getBoundingClientRect();
-    scene.setInsets(0, window.innerHeight - r.top + 6);
-  };
+  const inset = () => scene.setInsets(0, window.innerHeight - deck.getBoundingClientRect().top + 6);
   new ResizeObserver(inset).observe(deck);
   window.addEventListener('resize', inset);
   inset();
@@ -197,7 +239,7 @@ function wireControls() {
 
 // ---------- a round ----------
 async function climb() {
-  if (state.phase !== 'idle' || !state.ready) return;
+  if (state.phase !== 'idle' || !state.ready || anySheetOpen()) return;
   unlockSound();
   showError('');
   state.phase = 'climbing';

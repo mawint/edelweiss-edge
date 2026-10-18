@@ -28,7 +28,7 @@ Before starting work, find out where things stand:
 ## Rules of thumb
 - Never add money logic to the client: payouts come from book events (`src/book.ts`).
 - Player-facing text with bet/buy/pay words needs a social-casino version (`data-social` in `index.html`, `say()` in `src/main.ts`). `src/wording.test.ts` enforces it.
-- The screen: `src/scene.ts` draws the mountain on a canvas (alpine cartoon) and only animates what it's told; `src/director.ts` turns a book into scene beats; `src/sound.ts` synthesizes every sound behind one mute. Cosmetic randomness (weather, teases) is seeded from the book id so replays match.
+- The screen: `src/scene.ts` draws the mountain on a canvas (alpine cartoon) and only animates what it's told; `src/director.ts` turns a book into scene beats; `src/sound.ts` synthesizes every sound behind one mute. Cosmetic randomness (weather, teases) is seeded from the book id so replays match. The rules screen is `src/rules.ts`, built from the exported numbers; its phrases go through `w(normal, social)`.
 - Fonts are bundled from `@fontsource` (no Google Fonts: the Stake build may not load external hosts).
 - `node qa/probes/frames.mjs` screenshots an animated round at intervals; the browser pane pauses animation when hidden.
 - Saved data uses `edelweiss.*` keys, never another game's (all the games run on localhost).

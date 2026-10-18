@@ -1,5 +1,6 @@
 /* Alpine-cartoon look: chunky ink outlines, cream panels, gold and red. The canvas fills the screen and
-   the deck sits over its bottom edge; the scene frames the ridge above the deck (Scene.setInsets). */
+   a single short deck sits over its bottom edge; the scene frames the ridge above it (Scene.setInsets).
+   What the window pays lives on the mountain itself, on the sign above the window. */
 @import '@fontsource/luckiest-guy/latin-400.css';
 @import '@fontsource/baloo-2/latin-500.css';
 @import '@fontsource/baloo-2/latin-700.css';
@@ -23,87 +24,85 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--night)
 #app { position: fixed; inset: 0; }
 #scene { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
 
-.deck {
-  position: absolute; left: 50%; bottom: max(10px, env(safe-area-inset-bottom)); translate: -50% 0;
-  width: min(1240px, calc(100% - 20px));
-  display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px 10px;
-  background: var(--cream); border: 4px solid var(--ink); border-radius: 18px; box-shadow: 0 6px 0 var(--ink);
-  padding: 8px 12px;
-}
-.grp { display: flex; align-items: center; gap: 6px; }
 button {
   font: inherit; font-weight: 700; color: var(--ink); background: #fff; border: 3px solid var(--ink); border-radius: 12px;
-  box-shadow: 0 3px 0 var(--ink); padding: 4px 10px; min-height: 40px; cursor: pointer; line-height: 1.05;
+  box-shadow: 0 3px 0 var(--ink); padding: 4px 10px; min-height: 44px; cursor: pointer; line-height: 1.05;
 }
 button:active:not(:disabled) { translate: 0 2px; box-shadow: 0 1px 0 var(--ink); }
 button:disabled { opacity: 0.5; cursor: default; }
 button:focus-visible { outline: 3px solid var(--red); outline-offset: 2px; }
-button small, .where small, .odds small, .balance small { display: block; font-weight: 500; font-size: 11px; color: var(--muted); }
+small { display: block; font-weight: 500; font-size: 11px; color: var(--muted); }
 
-.diffs button { display: grid; text-align: left; font-size: 14px; }
-.diffs button[aria-pressed='true'] { background: var(--gold); }
-.diffs button.edge[aria-pressed='true'] { background: var(--red); color: #fff; }
-.diffs button.edge[aria-pressed='true'] small { color: #ffe1e1; }
-
-.stepper button, .bet button { width: 40px; padding: 0; font-size: 18px; }
-.where { display: grid; text-align: center; min-width: 8.5em; }
-.where b { font-size: 15px; }
-.bet .where { min-width: 4.5em; }
-.stepper[hidden] { display: none; }
-
-.odds { display: grid; text-align: center; gap: 0; min-width: 5em; }
-.pays { font-family: var(--display); font-size: 28px; line-height: 1; color: var(--red); }
-
+/* ---------- the deck: menu, difficulty, bet, balance, Climb ---------- */
+.deck {
+  position: absolute; left: 50%; bottom: max(10px, env(safe-area-inset-bottom)); translate: -50% 0;
+  width: min(760px, calc(100% - 20px));
+  display: flex; align-items: center; gap: 10px;
+  background: var(--cream); border: 4px solid var(--ink); border-radius: 18px; box-shadow: 0 6px 0 var(--ink);
+  padding: 8px;
+}
+.icon { width: 44px; padding: 0; font-size: 20px; flex: none; }
+.pick { display: grid; text-align: left; min-width: 7.5em; flex: none; }
+.pick b { font-size: 16px; }
+.pick b::after { content: ' ▾'; font-size: 12px; }
+.bet { display: flex; align-items: center; gap: 4px; flex: none; }
+.bet button { width: 40px; padding: 0; font-size: 18px; }
+.val { display: grid; text-align: center; min-width: 4.6em; font-variant-numeric: tabular-nums; }
+.val b { font-size: 16px; }
+.balance { flex: none; }
 .climb {
-  font-family: var(--display); font-weight: 400; font-size: 30px; padding: 8px 22px 4px; background: var(--gold);
+  flex: 1; font-family: var(--display); font-weight: 400; font-size: 30px; padding: 8px 16px 4px; background: var(--gold);
   border-width: 4px; border-radius: 16px; box-shadow: 0 5px 0 var(--ink);
 }
-.meta { display: grid; gap: 4px; justify-items: center; }
-.balance { font-variant-numeric: tabular-nums; text-align: center; }
-.balance b { font-size: 15px; }
-.sound { min-height: 28px; font-size: 12px; padding: 2px 8px; box-shadow: none; border-width: 2px; }
-.error { flex-basis: 100%; margin: 0; text-align: center; color: var(--red); font-weight: 700; }
+.error { position: absolute; left: 0; right: 0; bottom: 100%; margin: 0 0 8px; text-align: center; color: #fff; font-weight: 700; text-shadow: 0 2px 0 var(--ink); }
 .error:empty { display: none; }
+
+/* ---------- sheets: difficulty picker and menu ---------- */
+.sheet {
+  width: min(560px, calc(100% - 20px)); max-height: min(86vh, 720px); padding: 0; overflow: hidden;
+  background: var(--cream); color: var(--ink); border: 4px solid var(--ink); border-radius: 20px; box-shadow: 0 8px 0 var(--ink);
+}
+.sheet[open] { display: flex; flex-direction: column; }
+.sheet::backdrop { background: rgba(15, 34, 54, 0.55); }
+.sheet header { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px 6px; }
+.sheet h2 { margin: 0; font-family: var(--display); font-weight: 400; font-size: 30px; color: var(--red); letter-spacing: 0.01em; }
+.lead { margin: 0 16px 10px; color: var(--muted); }
+.choices { display: grid; gap: 8px; padding: 0 14px 14px; }
+.choice { display: grid; grid-template-columns: 1fr auto; align-items: center; text-align: left; gap: 2px 12px; padding: 8px 12px; }
+.choice b { font-size: 18px; }
+.choice .range { font-family: var(--display); font-weight: 400; font-size: 20px; color: var(--red); grid-row: span 2; }
+.choice[aria-pressed='true'] { background: var(--gold); }
+.choice.edge[aria-pressed='true'] { background: var(--red); color: #fff; }
+.choice.edge[aria-pressed='true'] small, .choice.edge[aria-pressed='true'] .range { color: #fff; }
+.toggles { display: flex; gap: 8px; padding: 0 14px 10px; }
+.toggle { flex: 1; }
+.toggle[aria-pressed='true'] { background: var(--gold); }
+.rules { overflow-y: auto; padding: 4px 18px 18px; border-top: 3px solid var(--ink); font-size: 15px; line-height: 1.5; }
+.rules h3 { margin: 16px 0 4px; font-family: var(--display); font-weight: 400; font-size: 20px; color: var(--ink); }
+.rules p, .rules ul { margin: 0 0 8px; }
+.rules ul { padding-left: 20px; }
+.rules table { width: 100%; border-collapse: collapse; margin: 6px 0 10px; font-variant-numeric: tabular-nums; }
+.rules th, .rules td { text-align: left; padding: 4px 6px; border-bottom: 2px solid rgba(36, 21, 46, 0.15); }
+.rules th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
+/* Phones in portrait: two rows (menu, difficulty, bet; then Climb with the balance) */
+@media (max-width: 560px) {
+  .deck { flex-wrap: wrap; gap: 6px; padding: 6px; }
+  .pick { flex: 1; }
+  .climb { order: 5; font-size: 24px; padding: 6px 10px 2px; }
+  .balance { order: 4; }
+}
 /* Short screens (the 400×225 popout): one tight row, labels dropped */
 @media (max-height: 300px) {
-  .deck { padding: 4px 6px; gap: 4px; border-width: 3px; border-radius: 12px; bottom: 4px; box-shadow: 0 3px 0 var(--ink); }
-  button { min-height: 28px; padding: 2px 6px; font-size: 11px; border-width: 2px; box-shadow: 0 2px 0 var(--ink); border-radius: 8px; }
-  button small, .where small, .odds small, .balance small, .sound { display: none; }
-  .diffs button { font-size: 11px; }
-  .where { min-width: 5.5em; }
-  .where b, .balance b { font-size: 11px; }
-  .stepper button, .bet button { width: 26px; font-size: 12px; }
-  .pays { font-size: 16px; }
-  .climb { font-size: 16px; padding: 4px 10px 2px; border-width: 2px; box-shadow: 0 2px 0 var(--ink); }
-}
-/* Phones in portrait: three short rows (difficulty; window and pay; bet and Climb), with the balance and
-   sound on a tab above the deck so the mountain keeps the room */
-@media (max-width: 560px) {
-  .deck { gap: 6px; padding: 8px; }
-  .diffs { width: 100%; justify-content: space-between; gap: 4px; }
-  .diffs button { font-size: 12px; padding: 3px 6px; min-height: 36px; flex: 1; }
-  .stepper { flex: 1 1 60%; justify-content: space-between; }
-  .odds { flex: 0 0 auto; }
-  .where b, .where small { white-space: nowrap; }
-  .bet { order: 4; }
-  .stepper button, .bet button { width: 36px; min-height: 36px; }
-  .where { min-width: 0; }
-  .bet .where { min-width: 3.6em; }
-  .climb { order: 5; flex: 1; font-size: 24px; padding: 6px 10px 2px; }
-  .meta {
-    position: absolute; right: 14px; bottom: 100%; display: flex; align-items: center; gap: 8px;
-    background: var(--cream); border: 3px solid var(--ink); border-bottom: 0; border-radius: 12px 12px 0 0; padding: 3px 10px;
-  }
-  .balance small { display: inline; }
-  .balance b { font-size: 13px; }
-}
-/* Short beats narrow: the popout is both, and the mountain needs the room more than the labels do */
-@media (max-height: 300px) {
-  .diffs { width: 100%; }
-  .climb { order: 0; width: auto; }
-  .balance { display: none; }
-  .where, .bet .where, .odds { min-width: 0; }
-  .grp { gap: 3px; }
+  .deck { flex-wrap: nowrap; gap: 4px; padding: 3px; bottom: 4px; border-width: 3px; border-radius: 12px; box-shadow: 0 3px 0 var(--ink); }
+  button { min-height: 30px; font-size: 12px; border-width: 2px; box-shadow: 0 2px 0 var(--ink); border-radius: 8px; padding: 2px 6px; }
+  small, .balance { display: none; }
+  .icon, .bet button { width: 30px; font-size: 13px; }
+  .pick { min-width: 0; flex: none; }
+  .pick b, .val b { font-size: 12px; }
+  .val { min-width: 3.4em; }
+  .climb { order: 0; font-size: 16px; padding: 3px 8px 1px; border-width: 2px; box-shadow: 0 2px 0 var(--ink); }
+  .sheet h2 { font-size: 22px; }
 }

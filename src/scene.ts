@@ -110,9 +110,14 @@ export class Scene {
 
   /** Dragging the window on the mountain: called with the step under the pointer. */
   onDrag: ((step: number) => void) | null = null;
+  /** Tapping the sign's ◀ ▶ arrows: -1 or +1. */
+  onNudge: ((dir: number) => void) | null = null;
   dragEnabled = true;
   private dragging = false;
-  private hint = 1;
+  /** What the window pays and how often it wins, for the sign above it. */
+  private info: { pay: string; odds: string } | null = null;
+  /** Where the sign was last drawn (logical screen units), for tapping its arrows. */
+  private sign: { x: number; y: number; w: number; h: number; arrows: boolean } | null = null;
 
   constructor(private canvas: HTMLCanvasElement) {
     this.ctx = canvas.getContext('2d')!;
@@ -155,22 +160,30 @@ export class Scene {
   // ---------- dragging the window in frame ----------
   private wireDrag() {
     const c = this.canvas;
-    const stepAt = (e: PointerEvent) => {
+    const local = (e: PointerEvent) => {
       const r = c.getBoundingClientRect();
-      const sx = ((e.clientX - r.left) / r.width) * this.W;
-      const wx = (sx - this.W / 2) / this.cam.z + this.cam.x;
-      return Math.floor(wx / SW);
+      return { x: ((e.clientX - r.left) / r.width) * this.W, y: ((e.clientY - r.top) / r.height) * this.H };
     };
+    const stepAt = (e: PointerEvent) => Math.floor(((local(e).x - this.W / 2) / this.cam.z + this.cam.x) / SW);
     const can = () => this.dragEnabled && !this.busy && this.mode === 'overview' && this.window !== 'edge';
+    /** -1 or +1 when the point is on one of the sign's arrows, else 0. */
+    const arrowAt = (p: { x: number; y: number }) => {
+      const g = this.sign;
+      if (!g?.arrows || p.y < g.y || p.y > g.y + g.h) return 0;
+      if (p.x >= g.x && p.x <= g.x + g.h) return -1;
+      if (p.x <= g.x + g.w && p.x >= g.x + g.w - g.h) return 1;
+      return 0;
+    };
     c.addEventListener('pointerdown', (e) => {
       if (!can()) return;
+      const dir = arrowAt(local(e));
+      if (dir) { this.onNudge?.(dir); return; }
       this.dragging = true;
-      this.hint = 0;
       c.setPointerCapture(e.pointerId);
       this.onDrag?.(stepAt(e));
     });
     c.addEventListener('pointermove', (e) => {
-      c.style.cursor = can() ? (this.dragging ? 'grabbing' : 'grab') : 'default';
+      c.style.cursor = !can() ? 'default' : arrowAt(local(e)) ? 'pointer' : this.dragging ? 'grabbing' : 'grab';
       if (this.dragging && can()) this.onDrag?.(stepAt(e));
     });
     const stop = () => { this.dragging = false; };
@@ -178,9 +191,10 @@ export class Scene {
     c.addEventListener('pointercancel', stop);
   }
 
-  setWindow(w: Window | null) {
+  setWindow(w: Window | null, info: { pay: string; odds: string } | null = null) {
     const changed = JSON.stringify(w) !== JSON.stringify(this.window);
     this.window = w;
+    this.info = info;
     if (changed && this.dragging) play('hop');
   }
 
@@ -392,11 +406,39 @@ export class Scene {
     }
     this.flag(w.from * SW + 6, stepTop(w.from), String(w.from), C.red, 1);
     this.flag((w.to + 1) * SW - 6, stepTop(w.to), String(w.to), C.red, -1);
-    // A grab hint until the player first drags the window
-    if (this.hint > 0 && this.mode === 'overview' && !this.busy && this.dragEnabled) {
-      const mx = ((w.from + w.to + 1) / 2) * SW, my = stepTop(w.to) - 210 + Math.sin(this.clock / 250) * 8;
-      this.bubble(mx, my, '◀ drag me ▶', 34);
+  }
+
+  /** The sign above the window, in screen space so it stays readable and tappable at any zoom. */
+  private drawSign() {
+    this.sign = null;
+    const w = this.window, info = this.info;
+    if (!w || !info || this.busy || this.mode !== 'overview') return;
+    const c = this.ctx, edge = w === 'edge';
+    const wx = edge ? edgeX() + 70 : ((w.from + w.to + 1) / 2) * SW;
+    const wy = edge ? stepTop(TOP) + 40 : stepTop(w.to) - 130;
+    const h = 58, arrows = !edge && this.dragEnabled;
+    c.font = `40px ${FD}`;
+    const payW = c.measureText(info.pay).width;
+    c.font = `700 15px ${FU}`;
+    const textW = Math.max(payW, c.measureText(info.odds).width) + 24;
+    const width = textW + (arrows ? h * 2 : 0);
+    let x = (wx - this.cam.x) * this.cam.z + this.W / 2 - width / 2;
+    let y = (wy - this.cam.y) * this.cam.z + this.H / 2 - h;
+    x = Math.max(8, Math.min(this.W - width - 8, x));
+    y = Math.max(this.inset.top + 54, Math.min(this.H - this.inset.bottom - h - 8, y));
+    const bob = this.reduce ? 0 : Math.sin(this.clock / 300) * 2;
+    y += bob;
+    this.rrect(x, y, width, h, 16); this.fillInk(C.cream, 4);
+    if (arrows) {
+      [[x + h / 2, '◀'], [x + width - h / 2, '▶']].forEach(([ax, glyph]) => {
+        this.ellipse(ax as number, y + h / 2, h / 2 - 7, h / 2 - 7); this.fillInk(C.gold, 3.5);
+        this.text(glyph as string, ax as number, y + h / 2 + 1, `700 20px ${FU}`, C.ink, 0);
+      });
     }
+    const mid = x + width / 2;
+    this.text(info.pay, mid, y + 23, `36px ${FD}`, edge ? C.red : C.red, 0);
+    this.text(info.odds, mid, y + 46, `700 14px ${FU}`, C.ink, 0);
+    this.sign = { x, y: y - bob, w: width, h, arrows };
   }
   private flag(x: number, y: number, label: string, color: string, dir: number) {
     const c = this.ctx;
@@ -473,8 +515,10 @@ export class Scene {
     c.scale(1 + u.sq * 0.55, 1 - u.sq); c.rotate(u.lean);
     c.lineJoin = 'round'; c.lineCap = 'round';
     c.save();
-    if (u.horn > 0.5) { c.translate(16, -76); c.scale(-1, 1); c.rotate(-0.55); } else { c.translate(-6, -60); c.rotate(-0.42); }
-    this.drawHorn(150);
+    // Carried over the shoulder, bell up behind him (slanting down to the ground read as dragging a log);
+    // swung out in front, bell down, when he plays it
+    if (u.horn > 0.5) { c.translate(16, -76); c.scale(-1, 1); c.rotate(-0.55); this.drawHorn(150); }
+    else { c.translate(8, -66); c.rotate(0.62 + Math.sin(u.walk) * 0.04); this.drawHorn(118); }
     c.restore();
     const ph = u.walk;
     ([[-6, Math.sin(ph) * 9], [6, -Math.sin(ph) * 9]] as const).forEach(([hx, sw]) => {
@@ -652,6 +696,7 @@ export class Scene {
     c.restore();
     this.drawParticles(this.sparts);
     this.drawVignette();
+    this.drawSign();
     this.drawMinimap();
     this.drawCards();
     this.drawWin();

@@ -4,6 +4,7 @@
 // honest, so a new string can't slip a "bet" or "buy" past the social switch.
 import fs from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { rulesHtml } from './rules';
 
 const RESTRICTED =
   /\b(bets?|betting|buy|buying|bought|bonus buy|buy bonus|cash|credit|currency|deposit|fund|gamble|gambling|money|paid|paid out|pay|payer|pays|payout|paytable|pay table|purchase|rebet|stake|wager|withdraw|total bet|win feature|cost of|at the cost of)\b/i;
@@ -31,5 +32,19 @@ describe('social-casino wording', () => {
     const said = [...main.matchAll(/say\(\s*(['`])(?:(?!\1)[^\\]|\\.)*\1\s*,\s*(['`])((?:(?!\2)[^\\]|\\.)*)\2\s*\)/g)].map((m) => m[3]);
     expect(said.length).toBeGreaterThan(2);
     expect([...social, ...said].filter((t) => RESTRICTED.test(t.replace(/\$\{[^}]*\}/g, '')))).toEqual([]);
+  });
+
+  it('keeps the rules screen free of restricted words in its social version', () => {
+    const text = rulesHtml(true).replace(/<[^>]+>/g, ' ');
+    expect(text.match(new RegExp(RESTRICTED.source, 'gi')) ?? []).toEqual([]);
+    // (the normal version does use them, so the switch is really doing something)
+    expect(RESTRICTED.test(rulesHtml(false).replace(/<[^>]+>/g, ' '))).toBe(true);
+  });
+
+  it('states the RTP, the maximum win, every mode, the controls and the disclaimer', () => {
+    const text = rulesHtml(false);
+    for (const want of ['RTP: 96.50% in every mode', 'Maximum win: 5,000×', 'Easy', 'Medium', 'Hard', 'Pinpoint', 'Over the Edge', 'Menu (☰)', 'Turbo', 'Sound', 'Malfunction voids all wins and plays']) {
+      expect(text).toContain(want);
+    }
   });
 });

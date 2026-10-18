@@ -9,42 +9,35 @@
   </head>
   <body>
     <main id="app">
-      <canvas id="scene" aria-label="Ueli on the mountain. Drag on the mountain to move your window."></canvas>
+      <canvas id="scene" aria-label="Ueli on the mountain. Drag the sign over your window to move it, or use the arrow keys."></canvas>
 
       <section class="deck" id="deck" aria-label="Controls">
-        <div class="grp diffs" role="radiogroup" aria-label="Difficulty">
-          <button type="button" data-difficulty="easy">Easy<small>8 steps</small></button>
-          <button type="button" data-difficulty="medium">Medium<small>5 steps</small></button>
-          <button type="button" data-difficulty="hard">Hard<small>3 steps</small></button>
-          <button type="button" data-difficulty="pinpoint">Pinpoint<small>1 step</small></button>
-          <button type="button" data-difficulty="edge" class="edge">Edge<small>he falls</small></button>
-        </div>
-
-        <div class="grp stepper" id="stepper">
-          <button type="button" id="nudge-down" aria-label="Move the window down a step">◀</button>
-          <div class="where"><b id="window-label">Steps 11–15</b><small id="window-alt">2’552–2’680 m</small></div>
-          <button type="button" id="nudge-up" aria-label="Move the window up a step">▶</button>
-        </div>
-
-        <div class="grp odds">
-          <span class="pays" id="pays">4.0×</span>
-          <small id="chance">wins 1 in 5.4</small>
-        </div>
-
-        <div class="grp bet">
+        <button type="button" class="icon" id="menu-open" aria-label="Menu">☰</button>
+        <button type="button" class="pick" id="diff-open" aria-haspopup="dialog"><small>Difficulty</small><b id="diff-label">Medium</b></button>
+        <div class="bet">
           <button type="button" id="bet-down" aria-label="Lower the bet" data-social-label="Lower the play amount">−</button>
-          <div class="where"><small data-social="Play amount">Bet</small><b id="bet">…</b></div>
+          <div class="val"><small data-social="Play amount">Bet</small><b id="bet">…</b></div>
           <button type="button" id="bet-up" aria-label="Raise the bet" data-social-label="Raise the play amount">+</button>
         </div>
-
+        <div class="val balance"><small>Balance</small><b id="balance">…</b></div>
         <button type="button" class="climb" id="climb">Climb!</button>
-
-        <div class="grp meta">
-          <span class="balance"><small>Balance</small> <b id="balance">…</b></span>
-          <button type="button" class="sound" id="sound" aria-pressed="true">Sound on</button>
-        </div>
         <p class="error" id="error" role="alert"></p>
       </section>
+
+      <dialog class="sheet" id="diff-sheet" aria-labelledby="diff-title">
+        <header><h2 id="diff-title">Difficulty</h2><button type="button" class="icon close" aria-label="Close">✕</button></header>
+        <p class="lead">How wide is your window? Narrower windows win less often, so they win more.</p>
+        <div class="choices" id="diff-list"></div>
+      </dialog>
+
+      <dialog class="sheet" id="menu-sheet" aria-labelledby="menu-title">
+        <header><h2 id="menu-title">Menu</h2><button type="button" class="icon close" aria-label="Close">✕</button></header>
+        <div class="toggles">
+          <button type="button" class="toggle" id="sound" aria-pressed="true">Sound <b>On</b></button>
+          <button type="button" class="toggle" id="turbo" aria-pressed="false">Turbo <b>Off</b></button>
+        </div>
+        <article class="rules" id="rules"></article>
+      </dialog>
 
       <p class="sr-only" id="callout" aria-live="polite"></p>
     </main>
