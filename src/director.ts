@@ -99,8 +99,9 @@ export async function stageRound(book: Book, scene: Scene, o: StageOptions): Pro
     if (plan.win > 0) {
       const edge = plan.window === 'edge';
       const sub = `${plan.pay}× ${plan.multiplier > 1 ? `× ${plan.multiplier} edelweiss` : ''}`.trim();
-      say(`${edge ? 'He went over. You called it.' : 'He stopped in your window!'} Win ${o.format(plan.win * o.bet)}.`);
-      await scene.won('WIN', sub, plan.win * o.bet, o.format);
+      say(`${edge ? 'He went over. You called it.' : 'He stopped in your window!'} Win ${o.format(Math.round(plan.win * o.bet * 1e6) / 1e6)}.`);
+      // (bet × multiplier in floating point can land a hair off the cent, e.g. 0.2 × 4 = 0.8000000000000002)
+      await scene.won('WIN', sub, Math.round(plan.win * o.bet * 1e6) / 1e6, o.format);
     } else {
       const sub = plan.window === 'edge'
         ? book.events.some((e) => e.type === 'feature' && e.kind === 'rescue') ? 'Barry saved him. Not your call.' : 'He stayed on the mountain'
