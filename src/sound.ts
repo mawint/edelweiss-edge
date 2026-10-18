@@ -3,7 +3,7 @@
 
 type Sfx =
   | 'bell' | 'hop' | 'land' | 'heart' | 'rumble' | 'wind' | 'whistle' | 'chime' | 'yodel' | 'horn'
-  | 'fanfare' | 'bark' | 'goat' | 'whoosh' | 'stamp' | 'thunder' | 'cable' | 'sad';
+  | 'fanfare' | 'bark' | 'goat' | 'whoosh' | 'stamp' | 'thunder' | 'cable' | 'sad' | 'tick' | 'clunk';
 
 const KEY = 'edelweiss.sound';
 
@@ -172,6 +172,13 @@ const SFX: Record<Sfx, Play> = {
   },
   thunder: (ac, out, t) => env(ac, out, through(noise(ac, t, 2.4), filter(ac, 'lowpass', 120)), t, 0.05, 2.2, 0.7),
   cable: (ac, out, t) => env(ac, out, through(osc(ac, 'sawtooth', 98, t, 1.6), filter(ac, 'lowpass', 260)), t, 0.2, 1.3, 0.1),
+  /** The step counter's reel passing a digit. */
+  tick: (ac, out, t) => env(ac, out, through(osc(ac, 'square', 1900, t, 0.03), filter(ac, 'bandpass', 2200, 2)), t, 0.001, 0.025, 0.08),
+  /** The reel locking onto its number. */
+  clunk(ac, out, t) {
+    env(ac, out, through(noise(ac, t, 0.12), filter(ac, 'lowpass', 900)), t, 0.002, 0.1, 0.35);
+    env(ac, out, osc(ac, 'triangle', 220, t, 0.2), t, 0.002, 0.18, 0.3);
+  },
   sad: (ac, out, t) =>
     [392, 349, 311, 262].forEach((f, i) => env(ac, out, through(osc(ac, 'sawtooth', f, t + i * 0.22, 0.3), filter(ac, 'lowpass', 800)), t + i * 0.22, 0.02, 0.25, 0.12)),
 };

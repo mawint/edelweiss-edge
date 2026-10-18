@@ -118,6 +118,8 @@ export class Scene {
   private marmot: { x: number; y: number; up: number } | null = null;
   private win: { text: string; sub: string; amount: number; shown: number; format: (v: number) => string } | null = null;
   private flyers: Flyer[] = [];
+  /** The step counter: spins to a climb's step count, then counts down as he walks. */
+  private reel: { title: string; pos: number; target: number; remaining: number | null; alpha: number; pulse: number; note: string } | null = null;
   private wipe: { t: number; swapped: boolean; swap: () => void; done: () => void } | null = null;
   private nextFlyer = 1500;
 
@@ -933,6 +935,7 @@ export class Scene {
     this.drawVignette();
     this.drawSign();
     this.drawMinimap();
+    this.drawCounter();
     this.drawCards();
     this.drawWin();
     this.drawWipe();
@@ -971,6 +974,7 @@ export class Scene {
     this.weather = weather;
     this.picked = [];
     this.win = null;
+    this.reel = null;
     this.cabin = null; this.balls = []; this.dog = null; this.rope = false; this.rings = []; this.wind = 0; this.marmot = null;
     this.tense(false);
     this.mode = 'overview';
@@ -1026,6 +1030,7 @@ export class Scene {
       const target = this.u.step + dir;
       const tense = !!o.final && (this.inWindow(target) !== this.inWindow(this.u.step) || target >= TOP - 1 || (this.window === 'edge' && target >= TOP - 2));
       this.tense(tense);
+      if (o.count && this.reel?.remaining) { this.reel.remaining--; this.reel.pulse = 1; void this.tween(200, (p) => { if (this.reel) this.reel.pulse = 1 - p; }); }
       await this.hop(target, { ring: o.count ? ++k : 0, dur: tense ? 420 : o.dur ?? 280, height: dir < 0 ? 22 : 36, onLand: o.onLand });
       if (target >= TOP - 1) this.burst(this.u.x + 40, this.u.y, 4, 'pebble', { speed: 120, angle: 0.3, spread: 1, size: 7, life: 1200 });
       await this.sleep(tense ? 220 : 90);
@@ -1033,7 +1038,57 @@ export class Scene {
     this.tense(false);
   }
 
-  async climbLabel(n: number) { this.card(`CLIMB ${n} OF 3`, '', C.cream, { size: 40, big: false, top: true, dur: 900 }); await this.sleep(400); }
+  /**
+   * Spin the step counter and stop it on `steps`: a few loops through 0-9 that slow down and lock on, so the
+   * player sees how far this climb goes before he moves. It then counts down as he walks (see walk()).
+   */
+  async spinCounter(title: string, steps: number) {
+    const r = { title, pos: 0, target: steps, remaining: null as number | null, alpha: 0, pulse: 0, note: '' };
+    this.reel = r;
+    void this.tween(180, (p) => { r.alpha = p; });
+    if (this.reduce) { r.pos = steps; } else {
+      const loops = this.speed > 1 ? 10 : 20, dist = loops + steps;
+      let last = -1;
+      await this.tween(this.speed > 1 ? 700 : 1500, (p) => {
+        r.pos = dist * (1 - Math.pow(1 - p, 3));
+        const d = Math.floor(r.pos);
+        if (d !== last) { last = d; play('tick'); }
+      });
+      r.pos = dist;
+    }
+    play('clunk'); r.pulse = 1; void this.tween(300, (p) => { r.pulse = 1 - p; });
+    r.remaining = steps;
+    r.note = steps === 0 ? 'Yodel break!' : steps === 1 ? 'step' : 'steps';
+    await this.sleep(450);
+  }
+  /** Fade the counter away once the climb is done. */
+  async hideCounter() {
+    const r = this.reel;
+    if (!r) return;
+    await this.tween(250, (p) => { r.alpha = 1 - p; });
+    if (this.reel === r) this.reel = null;
+  }
+  private drawCounter() {
+    const r = this.reel;
+    if (!r || r.alpha <= 0) return;
+    const c = this.ctx, w = 190, h = 128, x = this.W / 2 - w / 2, y = this.inset.top + 50;
+    const s = 1 + r.pulse * 0.08;
+    c.save(); c.globalAlpha = r.alpha; c.translate(this.W / 2, y + h / 2); c.scale(s, s); c.translate(-this.W / 2, -(y + h / 2));
+    this.rrect(x, y, w, h, 18); this.fillInk(C.cream, 4);
+    this.text(r.title, this.W / 2, y + 18, `20px ${FD}`, C.red, 0);
+    // The digit window: digits scroll up through it while spinning
+    const wx = this.W / 2 - 34, wy = y + 32, ww = 68, wh = 64;
+    this.rrect(wx, wy, ww, wh, 10); this.fillInk(C.ink, 3);
+    c.save(); c.beginPath(); c.roundRect(wx + 3, wy + 3, ww - 6, wh - 6, 8); c.clip();
+    const shown = r.remaining ?? Math.floor(r.pos) % 10;
+    const frac = r.remaining === null ? r.pos - Math.floor(r.pos) : 0;
+    for (const [digit, off] of [[shown, 0], [(shown + 1) % 10, 1]] as const) {
+      this.text(String(digit), this.W / 2, wy + wh / 2 + 4 + (off - frac) * wh, `52px ${FD}`, C.gold, 0);
+    }
+    c.restore();
+    if (r.note) this.text(r.note, this.W / 2, y + h - 14, `800 15px ${FU}`, C.ink, 0);
+    c.restore();
+  }
 
   async yodel() {
     const u = this.u;
@@ -1120,7 +1175,9 @@ export class Scene {
     await this.tween(1300, (p) => rings.forEach((r) => { const q = Math.max(0, p * 1.4 - r.k * 0.12); r.r = 10 + q * 700; r.a = Math.max(0, 1 - q); }));
     this.rings = [];
     u.horn = 0; u.face = 'happy';
+    await this.spinCounter('ECHO', to - u.step);
     await this.walk(Math.min(to, TOP), { count: true, final: true, onLand });
+    await this.hideCounter();
   }
 
   async foehn(to: number, onLand: (step: number) => void) {

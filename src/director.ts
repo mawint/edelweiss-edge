@@ -69,10 +69,12 @@ export async function stageRound(book: Book, scene: Scene, o: StageOptions): Pro
       switch (e.type) {
         case 'climb': {
           if (e.n > 1 && rng() < 0.2) await scene.tease();
-          await scene.climbLabel(e.n);
-          if (e.steps === 0) { say(`Climb ${e.n} of 3: he stops to yodel.`); await scene.yodel(); break; }
+          await scene.spinCounter(`CLIMB ${e.n} OF 3`, e.steps);
+          if (e.steps === 0) { say(`Climb ${e.n} of 3: he stops to yodel.`); await scene.yodel(); await scene.hideCounter(); break; }
           say(`Climb ${e.n} of 3: ${e.steps} step${e.steps > 1 ? 's' : ''}.`);
           await scene.walk(Math.min(e.to, TOP), { count: true, final: i === lastClimb, onLand: reach });
+          // (a climb that runs past the top leaves steps on the counter: the fall comes next)
+          if (e.to <= TOP) await scene.hideCounter();
           break;
         }
         case 'feature': {
@@ -87,6 +89,7 @@ export async function stageRound(book: Book, scene: Scene, o: StageOptions): Pro
         case 'fall':
           say("He's over the edge!");
           await scene.fall();
+          await scene.hideCounter();
           break;
         default:
           break;
