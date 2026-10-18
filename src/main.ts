@@ -155,7 +155,7 @@ function renderDifficulties() {
     .join('');
 }
 
-const anySheetOpen = () => !!document.querySelector('dialog[open]');
+const anySheetOpen = () => !!document.querySelector('dialog[open]') || !$('splash').hidden;
 
 // ---------- autoplay (review item [104]: it only starts from the panel's confirm button) ----------
 const auto = { left: 0, rounds: 25, stopOnWin: false, stopOnBig: true };
@@ -339,11 +339,64 @@ function describe(e: unknown): string {
 const showError = (text: string) => ($('error').textContent = text);
 
 // ---------- start ----------
+// ---------- title screen ----------
+let loadShown = 0;
+/** Move the loader's bar to `share` (0..1, never backwards) and say what's happening. */
+const setLoad = (share: number, text: string) => {
+  loadShown = Math.max(loadShown, share);
+  $('load-bar').style.transform = `scaleX(${loadShown})`;
+  $('load').setAttribute('aria-valuenow', String(Math.round(loadShown * 100)));
+  $('load-text').textContent = text;
+};
+let entered: () => void = () => {};
+/** enter() called before Play was showing (a probe, or a very quick tap): go in as soon as it shows. */
+let enterEarly = false;
+/** Shows Play and resolves once the player taps it: that tap is also what lets the browser play sound. */
+function waitForPlay(): Promise<void> {
+  const play = $<HTMLButtonElement>('play');
+  $('load').hidden = true;
+  play.hidden = false;
+  $('splash').classList.add('ready');
+  play.focus();
+  return new Promise((resolve) => { entered = resolve; if (enterEarly) enter(); });
+}
+function enter() {
+  if ($('play').hidden) { enterEarly = true; return; }
+  unlockSound();
+  const splash = $('splash');
+  // The loader fades out over the game's cloud bank, which then sweeps away to show the mountain
+  scene.revealWipe();
+  splash.classList.add('done');
+  setTimeout(() => { splash.hidden = true; }, 350);
+  $<HTMLButtonElement>('play').hidden = true;
+  entered();
+}
+function wireSplash() {
+  // A tap anywhere on the loader goes in once it's ready, like Crush Depth's
+  $('splash').addEventListener('click', enter);
+  $('retry').addEventListener('click', () => location.reload());
+  // (Enter and Space press the focused Play button on their own; this catches them if focus wandered)
+  window.addEventListener('keydown', (e) => {
+    if ($('splash').hidden || $('play').hidden) return;
+    if (e.code === 'Enter' || e.code === 'Space') { e.preventDefault(); enter(); }
+  });
+}
+/** The loader's fatal screen: what went wrong and a Reload button. */
+function splashError(text: string) {
+  $('load').hidden = true;
+  $('splash-error').textContent = text;
+  $('fatal').hidden = false;
+}
+
 async function start() {
   applyWording();
   wireControls();
+  wireSplash();
   syncControls();
-  if (launch.replay) return replay();
+  setLoad(0.15, 'Loading');
+  await (document.fonts?.ready ?? Promise.resolve()).catch(() => {});
+  setLoad(0.5, 'Connecting');
+  if (launch.replay) { setLoad(1, 'Ready'); await waitForPlay(); return replay(); }
   try {
     const auth = await rgs.authenticate();
     social ||= !!auth.config.jurisdiction?.socialCasino;
@@ -354,14 +407,16 @@ async function start() {
     state.bet = auth.config.defaultBetLevel / MICRO;
     state.ready = true;
     syncControls();
+    setLoad(1, 'Ready');
     // (a round left open by a refresh: show where it ended and settle it)
     if (auth.round?.active) {
       state.plan = await stageRound(bookOf(auth.round), scene, { format: money, bet: state.bet, social, instant: true, announce });
       state.balance = (await rgs.endRound()).balance.amount / MICRO;
       syncControls();
     }
+    await waitForPlay();
   } catch (e) {
-    showError(describe(e));
+    splashError(describe(e));
   }
 }
 
@@ -396,5 +451,5 @@ document.addEventListener('touchend', (e) => {
 for (const type of ['gesturestart', 'gesturechange']) document.addEventListener(type, (e) => e.preventDefault(), { passive: false });
 
 // QA hooks (qa/probes): the state, and the round and setup actions
-Object.assign(window, { game: { state, climb, syncControls, DIFFICULTIES } });
+Object.assign(window, { game: { state, climb, syncControls, enter, DIFFICULTIES } });
 void start();

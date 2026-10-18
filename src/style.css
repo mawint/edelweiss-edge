@@ -119,6 +119,74 @@ small { display: block; font-weight: 500; font-size: 11px; color: var(--muted); 
 .corner-sound[aria-pressed='false'] .mute { display: inline; stroke: var(--red); }
 @media (max-height: 300px) { .corner-sound { width: 30px; min-height: 30px; top: 4px; right: 4px; } .corner-sound svg { width: 18px; height: 18px; } }
 
+/* ---------- the loader: full page, studio first, then the game logo, progress and "tap to climb" ---------- */
+.loader {
+  position: absolute; inset: 0; z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: clamp(10px, 3vmin, 22px); text-align: center; cursor: default;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  /* the game's sunset sky, with the far range's silhouette along the bottom */
+  background: radial-gradient(130% 70% at 50% 100%, #ff9a6a 0%, #ffc98b 30%, #59a3d2 62%, #1f5e99 100%);
+  transition: opacity 0.35s ease;
+}
+.loader .range { position: absolute; left: 0; bottom: 0; width: 100%; height: 34%; z-index: 0; pointer-events: none; }
+.loader .range * { vector-effect: non-scaling-stroke; }
+.loader > :not(.range):not(.sky) { position: relative; z-index: 1; }
+.loader.ready { cursor: pointer; }
+.loader.done { opacity: 0; pointer-events: none; }
+.studio {
+  display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: clamp(11px, 2.2vmin, 14px);
+  letter-spacing: 0.32em; text-transform: uppercase; color: var(--cream); text-shadow: 0 2px 0 rgba(36, 21, 46, 0.5);
+}
+.logo { display: grid; justify-items: center; }
+.flower { width: clamp(56px, 14vmin, 104px); height: auto; margin-bottom: -0.6em; filter: drop-shadow(0 4px 0 #24152e); animation: sway 4s ease-in-out infinite; }
+@keyframes sway { 50% { transform: rotate(10deg); } }
+.logo h1 {
+  margin: 0; font-family: var(--display); font-weight: 400; font-size: clamp(40px, 11vmin, 96px); line-height: 1; color: var(--gold);
+  text-shadow: 4px 4px 0 var(--ink), -3px -3px 0 var(--ink), 3px -3px 0 var(--ink), -3px 3px 0 var(--ink), 0 8px 0 var(--ink);
+}
+.load { width: min(64vw, 340px); display: grid; gap: 8px; justify-items: center; }
+.load[hidden] { display: none; }
+.track { width: 100%; height: 18px; border: 4px solid var(--ink); border-radius: 12px; background: var(--cream); overflow: hidden; box-shadow: 0 4px 0 var(--ink); }
+/* (a scaleX transform, not a width change: cheap for phones while the game loads) */
+.track i { display: block; height: 100%; background: var(--gold); transform-origin: 0 50%; transform: scaleX(0); transition: transform 0.3s ease-out; }
+.load small { font-weight: 800; font-size: clamp(11px, 2vmin, 13px); letter-spacing: 0.18em; text-transform: uppercase; color: var(--cream); text-shadow: 0 2px 0 rgba(36, 21, 46, 0.5); }
+/* "Tap to climb": a gold pill like the game's Climb button, bobbing gently (the whole screen is tappable) */
+.tap {
+  font-family: var(--display); font-weight: 400; font-size: clamp(24px, 5.4vmin, 38px); line-height: 1; color: var(--ink);
+  background: var(--gold); border: 4px solid var(--ink); border-radius: 18px; box-shadow: 0 6px 0 var(--ink);
+  padding: 12px 34px; display: flex; align-items: center; justify-content: center; letter-spacing: 0.02em;
+  animation: bob 1.6s ease-in-out infinite;
+}
+.tap span { position: relative; top: 0.14em; }
+.tap:active:not(:disabled) { translate: 0 3px; box-shadow: 0 3px 0 var(--ink); }
+@keyframes bob { 50% { transform: translateY(-5px); } }
+
+/* ---------- the loader's sky: clouds, a balloon, a paraglider and birds drifting by ---------- */
+.sky { position: absolute; inset: 0; overflow: hidden; z-index: 0; pointer-events: none; }
+.sky svg { position: absolute; left: 0; overflow: visible; }
+.cloud { width: clamp(110px, 18vmin, 190px); }
+.c1 { top: 12%; animation: drift 46s linear infinite; animation-delay: -10s; }
+.c2 { top: 30%; width: clamp(80px, 13vmin, 140px); animation: drift 62s linear infinite; animation-delay: -38s; }
+.c3 { top: 6%; width: clamp(70px, 11vmin, 120px); animation: drift 75s linear infinite; animation-delay: -60s; }
+.balloon { width: clamp(46px, 8vmin, 76px); top: 20%; animation: drift 90s linear infinite reverse, rise 7s ease-in-out infinite alternate; animation-delay: -25s, 0s; }
+.glider { width: clamp(52px, 9vmin, 84px); top: 38%; animation: glide 34s linear infinite; animation-delay: -6s; }
+.birds { width: clamp(90px, 14vmin, 140px); top: 22%; animation: drift 24s linear infinite; animation-delay: -4s; }
+.birds .w { animation: flap 0.6s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: center; }
+.birds .w:nth-child(2n) { animation-delay: -0.3s; }
+@keyframes drift { from { transform: translateX(-30vw); } to { transform: translateX(130vw); } }
+@keyframes glide { from { transform: translate(130vw, -6vh) rotate(-4deg); } to { transform: translate(-30vw, 10vh) rotate(4deg); } }
+@keyframes rise { from { margin-top: 0; } to { margin-top: -5vh; } }
+@keyframes flap { to { transform: scaleY(-0.6); } }
+.fatal {
+  display: flex; flex-direction: column; align-items: center; gap: 10px; max-width: 420px; padding: 18px 20px;
+  background: var(--cream); border: 4px solid var(--ink); border-radius: 20px; box-shadow: 0 6px 0 var(--ink);
+}
+.fatal[hidden] { display: none; }
+.fatal b { color: var(--red); font-size: 18px; }
+.fatal span { color: var(--muted); font-weight: 700; }
+.fatal button { background: var(--gold); min-width: 140px; }
+@media (prefers-reduced-motion: reduce) { .flower, .tap, .sky svg, .birds .w { animation: none; } .track i, .loader { transition: none; } }
+
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
 /* Phones in portrait: two rows (menu, difficulty, bet; then Climb with the balance) */

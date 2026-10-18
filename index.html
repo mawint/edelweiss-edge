@@ -62,6 +62,52 @@
         <button type="button" class="climb start" id="auto-start"><span>Start 25 climbs</span></button>
       </dialog>
 
+      <!-- The loader, full page (the studio pattern from Midnight Meridian and Crush Depth): studio, game logo,
+           progress, then "tap to climb". The tap is also what lets the browser play sound. -->
+      <section class="loader" id="splash" aria-labelledby="splash-title">
+        <svg class="range" viewBox="0 0 1000 300" preserveAspectRatio="none" aria-hidden="true">
+          <polygon points="0,150 110,40 200,110 320,20 450,120 560,50 680,130 800,30 920,110 1000,60 1000,300 0,300" fill="#e5949f" stroke="#24152e" stroke-width="4" stroke-linejoin="round" />
+          <polygon points="320,20 290,62 320,52 345,66" fill="#ffedef" /><polygon points="800,30 772,68 800,58 826,72" fill="#ffedef" />
+          <polygon points="0,220 90,140 190,200 300,120 420,190 540,130 650,210 760,140 880,200 1000,150 1000,300 0,300" fill="#7a68a8" stroke="#24152e" stroke-width="4" stroke-linejoin="round" />
+          <polygon points="300,120 276,154 300,146 322,160" fill="#f1ecff" /><polygon points="760,140 738,172 760,164 782,176" fill="#f1ecff" />
+        </svg>
+        <!-- Things drifting through the sky while it loads, like the game's own flyers -->
+        <div class="sky" aria-hidden="true">
+          <svg class="cloud c1" viewBox="-40 -40 160 80"><g stroke="#24152e" stroke-width="7"><ellipse cx="0" cy="0" rx="34" ry="27" /><ellipse cx="36" cy="-14" rx="40" ry="32" /><ellipse cx="78" cy="0" rx="30" ry="24" /><ellipse cx="40" cy="10" rx="34" ry="27" /></g><g fill="#fff3e6"><ellipse cx="0" cy="0" rx="34" ry="27" /><ellipse cx="36" cy="-14" rx="40" ry="32" /><ellipse cx="78" cy="0" rx="30" ry="24" /><ellipse cx="40" cy="10" rx="34" ry="27" /></g></svg>
+          <svg class="cloud c2" viewBox="-40 -40 160 80"><g stroke="#24152e" stroke-width="7"><ellipse cx="0" cy="0" rx="34" ry="27" /><ellipse cx="36" cy="-14" rx="40" ry="32" /><ellipse cx="78" cy="0" rx="30" ry="24" /><ellipse cx="40" cy="10" rx="34" ry="27" /></g><g fill="#fff3e6"><ellipse cx="0" cy="0" rx="34" ry="27" /><ellipse cx="36" cy="-14" rx="40" ry="32" /><ellipse cx="78" cy="0" rx="30" ry="24" /><ellipse cx="40" cy="10" rx="34" ry="27" /></g></svg>
+          <svg class="cloud c3" viewBox="-40 -40 160 80"><g stroke="#24152e" stroke-width="7"><ellipse cx="0" cy="0" rx="34" ry="27" /><ellipse cx="36" cy="-14" rx="40" ry="32" /><ellipse cx="78" cy="0" rx="30" ry="24" /><ellipse cx="40" cy="10" rx="34" ry="27" /></g><g fill="#fff3e6"><ellipse cx="0" cy="0" rx="34" ry="27" /><ellipse cx="36" cy="-14" rx="40" ry="32" /><ellipse cx="78" cy="0" rx="30" ry="24" /><ellipse cx="40" cy="10" rx="34" ry="27" /></g></svg>
+          <svg class="balloon" viewBox="-60 -70 120 165"><defs><clipPath id="env"><path d="M0 60C-50 20-56-60 0-64C56-60 50 20 0 60Z" /></clipPath></defs>
+            <g clip-path="url(#env)"><rect x="-60" y="-70" width="120" height="140" fill="#fff" /><rect x="-40" y="-70" width="16" height="140" fill="#e2383f" /><rect x="-8" y="-70" width="16" height="140" fill="#e2383f" /><rect x="24" y="-70" width="16" height="140" fill="#e2383f" /></g>
+            <path d="M0 60C-50 20-56-60 0-64C56-60 50 20 0 60Z" fill="none" stroke="#24152e" stroke-width="4" />
+            <path d="M-8 58L-10 76M8 58L10 76" stroke="#24152e" stroke-width="3" /><rect x="-12" y="74" width="24" height="16" rx="3" fill="#a8743e" stroke="#24152e" stroke-width="3" /></svg>
+          <svg class="glider" viewBox="-60 -40 120 120"><path d="M-50 0Q0-34 50 0Q0-18-50 0Z" fill="#ffc93c" stroke="#24152e" stroke-width="4" stroke-linejoin="round" /><path d="M-30-10L0 46M-10-14L0 46M10-14L0 46M30-10L0 46" stroke="#24152e" stroke-width="1.6" /><circle cx="0" cy="52" r="6" fill="#f7c8a0" stroke="#24152e" stroke-width="2.5" /><rect x="-6" y="56" width="12" height="14" rx="4" fill="#e2383f" stroke="#24152e" stroke-width="2.5" /></svg>
+          <svg class="birds" viewBox="-130 -30 160 60"><g fill="none" stroke="#24152e" stroke-width="3.5" stroke-linecap="round"><path class="w" d="M-10-4Q-4-6 0 0Q4-6 10-4" /><path class="w" d="M-36 8Q-30 6-26 12Q-22 6-16 8" /><path class="w" d="M-62 20Q-56 18-52 24Q-48 18-42 20" /><path class="w" d="M-88 8Q-82 6-78 12Q-74 6-68 8" /><path class="w" d="M-114-4Q-108-6-104 0Q-100-6-94-4" /></g></svg>
+        </div>
+        <div class="studio"><img src="/copperwick-mark.svg" alt="" width="34" height="40" /><span>Copperwick Studios</span></div>
+        <div class="logo">
+          <svg class="flower" viewBox="-50 -50 100 100" aria-hidden="true">
+            <g stroke="#24152e" stroke-width="4" stroke-linejoin="round">
+              <ellipse cx="0" cy="-27" rx="11" ry="24" fill="#fff" transform="rotate(0)" /><ellipse cx="0" cy="-27" rx="11" ry="24" fill="#fff" transform="rotate(45)" />
+              <ellipse cx="0" cy="-27" rx="11" ry="24" fill="#fff" transform="rotate(90)" /><ellipse cx="0" cy="-27" rx="11" ry="24" fill="#fff" transform="rotate(135)" />
+              <ellipse cx="0" cy="-27" rx="11" ry="24" fill="#fff" transform="rotate(180)" /><ellipse cx="0" cy="-27" rx="11" ry="24" fill="#fff" transform="rotate(225)" />
+              <ellipse cx="0" cy="-27" rx="11" ry="24" fill="#fff" transform="rotate(270)" /><ellipse cx="0" cy="-27" rx="11" ry="24" fill="#fff" transform="rotate(315)" />
+              <circle r="13" fill="#ffc93c" />
+            </g>
+          </svg>
+          <h1 id="splash-title">Edelweiss Edge</h1>
+        </div>
+        <div class="load" id="load" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div class="track"><i id="load-bar"></i></div>
+          <small id="load-text" aria-live="polite">Loading</small>
+        </div>
+        <button type="button" class="tap" id="play" hidden><span>Tap to climb</span></button>
+        <div class="fatal" id="fatal" role="alert" hidden>
+          <b>Couldn't start the game</b>
+          <span id="splash-error"></span>
+          <button type="button" id="retry">Reload</button>
+        </div>
+      </section>
+
       <p class="sr-only" id="callout" aria-live="polite"></p>
     </main>
     <script type="module" src="/src/main.ts"></script>

@@ -20,6 +20,7 @@ Last updated October 17, 2026.
   - What the window pays and how often it wins sits on a sign above it on the mountain. Drag the sign (or anywhere on the mountain) to move the window, or tap its ◀ ▶ arrows; the arrow keys work too.
   - The menu: sound and turbo toggles and the rules (`src/rules.ts`, built from the exported numbers): pays per difficulty, RTP and max win per mode, the features, edelweiss, every control, and the disclaimer (review [25], [27], [235], [185], [107]). `src/wording.test.ts` renders the social version to check it.
   - No scrolling at any size (review [227]); checked at 1280×720, 430×932 and 400×225. Portrait phones get a steeper ridge.
+  - A full-page loader in the studio pattern (Midnight Meridian, Crush Depth): Copperwick Studios, the game logo, a progress bar and status, drifting clouds, balloon, paraglider and birds, then "Tap to climb" (anywhere, Space or Enter), which also unlocks sound; a cloud wipe reveals the game. A failure shows the reason and Reload.
   - A resumed round shows where it ended instantly; QA probes stage rounds instantly (`game.state.instant`).
 - **Fixtures:** `fixtures/books.json`, with 3 losses and 3 wins for each of the 92 modes from the math's `export_fixtures.py`, simulated in-process.
 

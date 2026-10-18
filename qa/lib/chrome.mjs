@@ -89,7 +89,8 @@ export async function openPage({ width = 1280, height = 720, dpr = 1, mobile = f
     async openGame(url, timeoutS = 60) {
       await send('Page.navigate', { url });
       for (let i = 0; i < timeoutS; i++) {
-        if ((await ev('!!(window.game && game.state.ready)').catch(() => false)) === true) return;
+        // (ready, then past the title screen's Play, which a probe has no reason to look at)
+        if ((await ev('!!(window.game && game.state.ready)').catch(() => false)) === true) { await ev('game.enter()').catch(() => {}); await sleep(500); return; }
         await sleep(1000);
       }
       throw new Error(`the game didn't load from ${url} in ${timeoutS}s`);

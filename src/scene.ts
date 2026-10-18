@@ -322,6 +322,11 @@ export class Scene {
     play('whoosh');
     await new Promise<void>((done) => { this.wipe = { t: 0, swapped: false, swap, done }; });
   }
+  /** Start fully covered by the cloud bank and sweep it away: the reveal after the loader. */
+  revealWipe(): Promise<void> {
+    if (this.reduce) return Promise.resolve();
+    return new Promise((done) => { this.wipe = { t: WIPE.cover, swapped: true, swap: () => {}, done }; });
+  }
   private drawWipe() {
     const w = this.wipe;
     if (!w) return;
