@@ -6,7 +6,7 @@ dist-stake
 qa/results
 qa/builds
 
-# secrets: never committed (this repo is public). The demo's password is a Netlify environment variable.
+# secrets: never committed (this repo is public)
 .env
 .env.*
 *.pem

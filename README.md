@@ -15,8 +15,6 @@ npm run dev
 ```
 Open http://localhost:5200. Sweet Push uses 5173, High Noon Push 5180 and Thunder Push 5190, so they can all run at once. `--host` is on, so you can open it from your phone on the same Wi-Fi using the network URL Vite prints.
 
-`npm run build` makes the hosted demo (`dist/`). `npm run build:stake` makes the Stake upload (`dist-stake/`).
+`npm run build` makes the demo build (`dist/`). `npm run build:stake` makes the Stake upload (`dist-stake/`).
 
 The screen is the alpine-cartoon mountain on a canvas: pick a difficulty, drag the sign over your window along the ridge (or tap its arrows), and Climb. The menu holds sound, turbo and the rules. Every round is staged from its book.
-
-The hosted demo (Netlify) sits behind a shared password. It's read from the `SITE_PASSWORD` environment variable in the Netlify project, and the site stays shut until it's set.

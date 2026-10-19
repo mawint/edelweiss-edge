@@ -27,7 +27,7 @@ jobs:
       - run: npm ci
       # the game must match the math it plays (windows, pays) and stage every book exactly
       - run: npm test
-      # the same command Netlify deploys with: tsc, then vite build
+      # the demo build: tsc, then vite build
       - run: npm run build
       # the build Stake gets: no prototype tools, relative paths (dist-stake/)
       - run: npm run build:stake

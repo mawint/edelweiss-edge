@@ -35,5 +35,5 @@ Before starting work, find out where things stand:
 - `src/scene.ts` draws every frame: keep per-frame work batched and allocation-free (static art goes in the rock layer or a sprite), and check `node qa/probes/perf.mjs` canvas calls before and after.
 - Saved data uses `edelweiss.*` keys, never another game's (all the games run on localhost).
 - Ports: 5200 dev, 4200 preview, 4201 Stake preview.
-- Both repos are public: never commit secrets. The demo's password is the `SITE_PASSWORD` Netlify environment variable.
+- Both repos are public: never commit secrets.
 - Commit and push only when asked.
