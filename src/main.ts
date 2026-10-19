@@ -451,5 +451,5 @@ document.addEventListener('touchend', (e) => {
 for (const type of ['gesturestart', 'gesturechange']) document.addEventListener(type, (e) => e.preventDefault(), { passive: false });
 
 // QA hooks (qa/probes): the state, and the round and setup actions
-Object.assign(window, { game: { state, climb, syncControls, enter, DIFFICULTIES } });
+Object.assign(window, { game: { state, climb, syncControls, enter, DIFFICULTIES, scene } });
 void start();

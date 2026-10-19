@@ -53,7 +53,52 @@ const range = (seed: number, n: number, amp: number) =>
     return -amp * (0.55 + 0.45 * Math.sin(x * 0.0042 + seed) * Math.cos(x * 0.0011 + seed * 2) + 0.25 * Math.sin(x * 0.019 + seed * 3) + 0.08 * Math.sin(x * 0.07));
   });
 const FAR = range(1.3, 101, 190), MID = range(4.1, 101, 140);
+/** A cloud's bounds around its origin, ink included. */
+const CLOUD_BOX = { x: -40, y: -52, w: 154, h: 96 };
 const CLOUDS = Array.from({ length: 7 }, (_, k) => ({ x: k * 620 + hash(k) * 300, y: 70 + hash(k + 7) * 120, s: 0.7 + hash(k + 3) * 0.6 }));
+
+/** One stone in the cliff. `clip` marks the ones that cross the ridge line and must be cut by it. */
+interface Block { x: number; y: number; w: number; h: number; fill: string; deco: 'moss' | 'snow' | 'crack' | null; pine: boolean; clip: boolean }
+/** Block size: bigger on a portrait phone, where the overview camera is much further out. */
+const blockSize = () => (PORTRAIT ? 118 : 84);
+const STONES = ['#6A5890', '#615087', '#58487D', '#6F5D97', '#5D4C83'];
+/** A stone shade darkened toward the deep purple, as if seen through `a` of shadow. */
+const shade = (hex: string, a: number) => {
+  const n = parseInt(hex.slice(1), 16), mix = (v: number, to: number) => Math.round(v * (1 - a) + to * a);
+  return `rgb(${mix(n >> 16, 30)},${mix((n >> 8) & 255, 20)},${mix(n & 255, 50)})`;
+};
+/**
+ * The cliff's stones for the current step size, laid out once instead of every frame. Sorted by colour so each
+ * shade fills in one go; stones wholly above the ridge line are left out.
+ */
+function layCliff(): Block[] {
+  const R = blockSize(), span = edgeX(), gap = PORTRAIT ? 7 : 5, top = stepTop(TOP) - R;
+  const blocks: Block[] = [];
+  for (let r = 0; top + r * R < 2400; r++) {
+    const y = top + r * R;
+    // Brick-style offset per row, block widths varied but fixed for each spot
+    let x = -3200 - hash(r * 7.3) * R;
+    for (let j = 0; x < span + R; j++) {
+      const seed = r * 131 + j * 17;
+      const w = R * (1.1 + hash(seed) * 1.3);
+      const bx = x, bw = w - gap;
+      x += w;
+      const h = R - gap + (hash(seed + 5) - 0.5) * R * 0.18;
+      const by = y + (hash(seed + 6) - 0.5) * R * 0.12;
+      if (bx >= span || by + h < topAtX(bx + bw) - 1) continue;
+      // Deeper below the ridge line, darker stone; altitude by height, so snow only high up and moss only low down
+      const depth = Math.max(0, by - (CAP - ((bx + bw / 2) / SW) * SH)) / (R * 6);
+      const alt = -by / (TOP * SH), hh = hash(seed + 9);
+      const deco = alt < 0.4 && hh > 0.62 ? 'moss' : alt > 0.7 && hh > 0.4 ? 'snow' : hh < 0.1 ? 'crack' : null;
+      const pine = alt < 0.35 && alt > -0.3 && hh > 0.93;
+      // (a pine pokes up into the row above, so it needs that much clear of the ridge line too)
+      const reach = by - 3 - (pine ? (70 * R) / 84 : 0);
+      const clip = bx < -3200 || bx + bw > span || reach < topAtX(bx) + 1;
+      blocks.push({ x: bx, y: by, w: bw, h, fill: shade(STONES[Math.floor(hash(seed + 1) * STONES.length)], Math.round(Math.min(0.55, depth * 0.55) * 20) / 20), deco, pine, clip });
+    }
+  }
+  return blocks.sort((a, b) => (a.fill < b.fill ? -1 : a.fill > b.fill ? 1 : 0));
+}
 
 type Face = 'happy' | 'scared' | 'dizzy' | 'yodel' | 'plain';
 type Pose = 'idle' | 'hop' | 'teeter';
@@ -148,7 +193,7 @@ export class Scene {
   // ---------- layout ----------
   private resize() {
     const r = this.canvas.getBoundingClientRect();
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const dpr = Math.min(this.maxDpr, window.devicePixelRatio || 1);
     this.canvas.width = Math.max(1, Math.round(r.width * dpr));
     this.canvas.height = Math.max(1, Math.round(r.height * dpr));
     const aspect = r.width / Math.max(1, r.height);
@@ -232,6 +277,8 @@ export class Scene {
 
   // ---------- frame loop ----------
   private frame = (now: number) => {
+    // (the first seconds are loading: fonts, the RGS, the loader's own animation)
+    if (now > 5000) this.watchPace(now - this.last);
     const dt = Math.min(50, now - this.last);
     this.last = now;
     const sdt = dt * this.scale * this.speed;
@@ -242,9 +289,33 @@ export class Scene {
     requestAnimationFrame(this.frame);
   };
 
+  /** The canvas resolution cap (device pixels per CSS pixel), lowered on a device that keeps dropping frames. */
+  private maxDpr = 2;
+  private pace: number[] = [];
+  private paceMs = 0;
+  /** The display's own frame time, as the quickest frames this session have shown. */
+  private vsync = Infinity;
+  /**
+   * Every two seconds: if more than one frame in six ran long (half again the display's frame time), the device
+   * can't keep up at this resolution, so drop it a notch. The frame time is learned from the quickest frames seen,
+   * so a phone held to a steady 30 fps (iOS Low Power Mode) isn't mistaken for one that's struggling.
+   */
+  private watchPace(ms: number) {
+    // (a hidden tab or a one-off hitch isn't the steady rate)
+    if (ms > 100 || this.maxDpr <= 1) return;
+    this.pace.push(ms); this.paceMs += ms;
+    if (this.paceMs < 2000) return;
+    const frames = this.pace.sort((a, b) => a - b), n = frames.length;
+    this.vsync = Math.min(this.vsync, frames[Math.floor(n * 0.1)]);
+    const long = frames.filter((f) => f > this.vsync * 1.5).length;
+    frames.length = 0; this.paceMs = 0;
+    if (long > n / 6) { this.maxDpr = Math.max(1, this.maxDpr - 0.5); this.resize(); }
+  }
+
   private update(sdt: number, dt: number) {
     this.scale += (this.scaleTarget - this.scale) * Math.min(1, dt * 0.006);
     this.tension += (this.tensionTarget - this.tension) * Math.min(1, dt * 0.005);
+    if (Math.abs(this.tension - this.tensionTarget) < 1e-3) this.tension = this.tensionTarget;
     const u = this.u;
     if (this.wipe) {
       this.wipe.t += dt;
@@ -256,6 +327,8 @@ export class Scene {
     const stiff = this.mode === 'overview' ? 0.0045 : 0.009;
     const k = 1 - Math.exp(-dt * stiff * this.speed), kz = 1 - Math.exp(-dt * 0.0032 * this.speed);
     this.cam.x = lerp(this.cam.x, t.x, k); this.cam.y = lerp(this.cam.y, t.y, k); this.cam.z = lerp(this.cam.z, t.z, kz);
+    // Land exactly on the target once it's too close to see, so a still camera really is still (see drawRock)
+    if (Math.abs(this.cam.x - t.x) < 0.05 && Math.abs(this.cam.y - t.y) < 0.05 && Math.abs(this.cam.z - t.z) < 1e-4) this.cam = t;
     u.sq *= Math.exp(-sdt * 0.012);
     u.ring = Math.max(0, u.ring - sdt / 380);
     u.swing = Math.sin(this.clock / 70) * u.ring;
@@ -270,8 +343,8 @@ export class Scene {
     };
     move(this.parts, sdt);
     move(this.sparts, dt);
-    this.pops = this.pops.filter((p) => (p.t += sdt) < p.life);
-    this.cards = this.cards.filter((c) => (c.t += dt * this.speed) < c.dur);
+    for (let i = this.pops.length - 1; i >= 0; i--) if ((this.pops[i].t += sdt) >= this.pops[i].life) this.pops.splice(i, 1);
+    for (let i = this.cards.length - 1; i >= 0; i--) if ((this.cards[i].t += dt * this.speed) >= this.cards[i].dur) this.cards.splice(i, 1);
     this.goats.forEach((g) => { g.sayT = Math.max(0, g.sayT - sdt); g.hop = Math.max(0, g.hop - sdt / 400); });
     this.shake = Math.max(0, this.shake - dt / 600);
     this.flash = Math.max(0, this.flash - dt / 350);
@@ -349,6 +422,13 @@ export class Scene {
   }
 
   // ---------- drawing helpers ----------
+  /** Gradients made once and kept (a fresh one every frame is garbage the phone has to collect). */
+  private gradients = new Map<string, CanvasGradient>();
+  private gradient(key: string, make: () => CanvasGradient) {
+    let g = this.gradients.get(key);
+    if (!g) { if (this.gradients.size > 24) this.gradients.clear(); g = make(); this.gradients.set(key, g); }
+    return g;
+  }
   private jit(k: number, amt = 1.6) { return this.reduce ? 0 : (hash(k * 13.7 + Math.floor(this.clock / 120) * 3.1) - 0.5) * amt * 2; }
   private ink(w = 4) { const c = this.ctx; c.lineWidth = w; c.strokeStyle = C.ink; c.lineJoin = 'round'; c.lineCap = 'round'; c.stroke(); }
   private fillInk(fill: string, w = 4) { this.ctx.fillStyle = fill; this.ctx.fill(); this.ink(w); }
@@ -364,14 +444,22 @@ export class Scene {
   // ---------- backdrop ----------
   private drawSky() {
     const c = this.ctx, P = SKY[this.weather], { W, H } = this;
-    const g = c.createLinearGradient(0, 0, 0, H);
-    P.sky.forEach((col, i) => g.addColorStop(i / (P.sky.length - 1), col));
-    c.fillStyle = g; c.fillRect(-40, -40, W + 80, H + 80);
+    c.fillStyle = this.gradient(`sky ${this.weather} ${H}`, () => {
+      const g = c.createLinearGradient(0, 0, 0, H);
+      P.sky.forEach((col, i) => g.addColorStop(i / (P.sky.length - 1), col));
+      return g;
+    });
+    c.fillRect(-40, -40, W + 80, H + 80);
     if (this.weather === 'storm') return;
     const sx = W * 0.79 - this.cam.x * 0.015, sy = H * 0.56 + -this.cam.y * 0.04;
-    const gl = c.createRadialGradient(sx, sy, 20, sx, sy, 190);
-    gl.addColorStop(0, 'rgba(255,240,200,.75)'); gl.addColorStop(1, 'rgba(255,240,200,0)');
-    c.fillStyle = gl; c.fillRect(sx - 200, sy - 200, 400, 400);
+    c.save(); c.translate(sx, sy);
+    c.fillStyle = this.gradient('glow', () => {
+      const g = c.createRadialGradient(0, 0, 20, 0, 0, 190);
+      g.addColorStop(0, 'rgba(255,240,200,.75)'); g.addColorStop(1, 'rgba(255,240,200,0)');
+      return g;
+    });
+    c.fillRect(-200, -200, 400, 400);
+    c.restore();
     this.ellipse(sx, sy, 62, 62); this.fillInk(this.weather === 'fog' ? '#F4F1E8' : '#FFE6A6', 4);
   }
   private drawRange(pts: number[], factor: number, base: number, fill: string, snow: string, lw: number) {
@@ -397,21 +485,44 @@ export class Scene {
       const span = 4400;
       const x = ((((cl.x - this.cam.x * 0.1 + this.clock * 0.008 * (1 + (i % 3))) % span) + span) % span) - 400;
       const y = cl.y + -this.cam.y * 0.05;
-      c.save(); c.translate(x, y); c.scale(cl.s, cl.s);
-      const blobs = [[0, 0, 34], [36, -14, 40], [78, 0, 30], [40, 10, 34]];
-      blobs.forEach(([bx, by, r]) => { this.ellipse(bx, by, r, r * 0.8); c.lineWidth = 8; c.strokeStyle = C.ink; c.stroke(); });
-      blobs.forEach(([bx, by, r]) => { this.ellipse(bx, by, r, r * 0.8); c.fillStyle = fill; c.fill(); });
-      c.restore();
+      const b = CLOUD_BOX;
+      c.drawImage(this.cloudSprite(fill), x + b.x * cl.s, y + b.y * cl.s, b.w * cl.s, b.h * cl.s);
     });
+  }
+  /** A cloud drawn once per colour and screen size, then stamped: eight thick-inked ellipses each frame added up. */
+  private cloudSprites = new Map<string, HTMLCanvasElement>();
+  private cloudSprite(fill: string) {
+    // (sharp at the biggest cloud's scale)
+    const res = (this.canvas.width / this.W) * 1.3, key = `${fill} ${res}`;
+    let sprite = this.cloudSprites.get(key);
+    if (sprite) return sprite;
+    if (this.cloudSprites.size > 6) this.cloudSprites.clear();
+    const b = CLOUD_BOX;
+    sprite = document.createElement('canvas');
+    sprite.width = Math.ceil(b.w * res); sprite.height = Math.ceil(b.h * res);
+    const g = sprite.getContext('2d')!;
+    g.scale(res, res); g.translate(-b.x, -b.y);
+    const blobs = [[0, 0, 34], [36, -14, 40], [78, 0, 30], [40, 10, 34]];
+    for (const pass of ['ink', 'fill']) {
+      for (const [bx, by, r] of blobs) {
+        g.beginPath(); g.ellipse(bx, by, r, r * 0.8, 0, 0, Math.PI * 2);
+        if (pass === 'ink') { g.lineWidth = 8; g.strokeStyle = C.ink; g.stroke(); } else { g.fillStyle = fill; g.fill(); }
+      }
+    }
+    this.cloudSprites.set(key, sprite);
+    return sprite;
   }
   private drawFog() {
     if (this.weather !== 'fog') return;
     const c = this.ctx;
+    const g = this.gradient('fog', () => {
+      const g = c.createLinearGradient(0, -40, 0, 40);
+      g.addColorStop(0, 'rgba(240,242,242,0)'); g.addColorStop(0.5, 'rgba(240,242,242,.55)'); g.addColorStop(1, 'rgba(240,242,242,0)');
+      return g;
+    });
     for (let k = 0; k < 3; k++) {
       const y = this.H * 0.44 + k * 90 + Math.sin(this.clock / 2000 + k) * 10;
-      const g = c.createLinearGradient(0, y - 40, 0, y + 40);
-      g.addColorStop(0, 'rgba(240,242,242,0)'); g.addColorStop(0.5, 'rgba(240,242,242,.55)'); g.addColorStop(1, 'rgba(240,242,242,0)');
-      c.fillStyle = g; c.fillRect(-40, y - 40, this.W + 80, 80);
+      c.save(); c.translate(0, y); c.fillStyle = g; c.fillRect(-40, -40, this.W + 80, 80); c.restore();
     }
   }
 
@@ -488,63 +599,98 @@ export class Scene {
   // ---------- the rock face: a cliff of chunky cartoon stone blocks ----------
   /** The part of the world on screen, so the cliff only draws the blocks you can see. */
   private view = { x0: 0, x1: 0, y0: 0, y1: 0 };
-  /** Block size: bigger on a portrait phone, where the overview camera is much further out. */
-  private blockSize() { return PORTRAIT ? 118 : 84; }
+  private cliff = { key: '', blocks: [] as Block[] };
+  private seen: Block[] = [];
+  /**
+   * The rock (the ridge's mass and its stones) is the costliest thing on screen and never moves in the world,
+   * so while the camera holds still it's painted once into this layer and copied each frame after that.
+   */
+  private rock = { layer: document.createElement('canvas'), painted: '', last: '' };
+  /** The screen shake this frame (logical units), which the rock layer is copied under. */
+  private shook = { x: 0, y: 0 };
 
-  private drawFace() {
-    const c = this.ctx, R = this.blockSize(), span = edgeX(), v = this.view;
+  private drawRock() {
+    const c = this.ctx, L = this.rock, sx = this.canvas.width / this.W, sy = this.canvas.height / this.H;
+    const key = `${this.cam.x},${this.cam.y},${this.cam.z},${SW},${SH},${this.canvas.width},${this.canvas.height}`;
+    // (a moving camera would repaint the layer every frame for nothing: draw straight to the screen then)
+    const still = key === L.last;
+    L.last = key;
+    if (!still) { this.paintRock(); return; }
+    if (L.painted !== key) {
+      L.layer.width = this.canvas.width; L.layer.height = this.canvas.height;
+      const main = this.ctx;
+      this.ctx = L.layer.getContext('2d')!;
+      try {
+        this.ctx.setTransform(sx, 0, 0, sy, 0, 0);
+        this.ctx.translate(this.W / 2, this.H / 2); this.ctx.scale(this.cam.z, this.cam.z); this.ctx.translate(-this.cam.x, -this.cam.y);
+        this.paintRock();
+      } finally { this.ctx = main; }
+      L.painted = key;
+    }
+    c.save(); c.setTransform(sx, 0, 0, sy, 0, 0); c.drawImage(L.layer, this.shook.x, this.shook.y, this.W, this.H); c.restore();
+  }
+  private paintRock() {
+    const c = this.ctx, R = blockSize(), v = this.view;
+    const layout = `${SW},${SH},${PORTRAIT}`;
+    if (this.cliff.key !== layout) this.cliff = { key: layout, blocks: layCliff() };
+    // The unjittered ridge: its boiling ink outline (drawn later, 6 wide) covers the difference
+    this.stair(false); c.lineTo(-3200, 2400); c.closePath();
+    c.fillStyle = C.mass; c.fill();
+    c.save(); c.clip();
     // The dark between the stones
     c.fillStyle = '#2B2145'; c.fillRect(v.x0 - 10, v.y0 - 10, v.x1 - v.x0 + 20, v.y1 - v.y0 + 20);
-    const top = stepTop(TOP) - R, gap = PORTRAIT ? 7 : 5;
-    const rows = Math.ceil((Math.min(v.y1, 2400) - top) / R);
-    const shades = ['#6A5890', '#615087', '#58487D', '#6F5D97', '#5D4C83'];
-    for (let r = Math.max(0, Math.floor((v.y0 - top) / R)); r <= rows; r++) {
-      const y = top + r * R;
-      // Brick-style offset per row, block widths varied but fixed for each spot
-      let x = -3200 - hash(r * 7.3) * R;
-      for (let j = 0; x < span + R; j++) {
-        const seed = r * 131 + j * 17;
-        const w = R * (1.1 + hash(seed) * 1.3);
-        const bx = x, bw = w - gap;
-        x += w;
-        if (bx > v.x1 || bx + bw < v.x0) continue;
-        const h = R - gap + (hash(seed + 5) - 0.5) * R * 0.18;
-        const by = y + (hash(seed + 6) - 0.5) * R * 0.12;
-        // Deeper below the ridge line, darker stone
-        const depth = Math.max(0, by - (CAP - ((bx + bw / 2) / SW) * SH)) / (R * 6);
-        c.globalAlpha = 1;
-        this.rrect(bx, by, bw, h, R * 0.28);
-        c.fillStyle = shades[Math.floor(hash(seed + 1) * shades.length)]; c.fill();
-        c.fillStyle = `rgba(30,20,50,${Math.min(0.55, depth * 0.55)})`; c.fill();
-        this.ink(PORTRAIT ? 4 : 3);
-        // Lit top edge
-        c.beginPath(); c.moveTo(bx + R * 0.2, by + 5); c.lineTo(bx + bw - R * 0.25, by + 5);
-        c.lineWidth = PORTRAIT ? 6 : 4; c.strokeStyle = 'rgba(190,175,230,.45)'; c.stroke();
-        // Altitude by height, not by how far along: snow only high up, moss only low down
-        const alt = -by / (TOP * SH), hh = hash(seed + 9);
-        if (alt < 0.4 && hh > 0.62) this.moss(bx + bw * 0.25, by, bw * 0.5, R);
-        else if (alt > 0.7 && hh > 0.4) this.snowCap(bx, by, bw, R);
-        else if (hh < 0.1) { c.beginPath(); c.moveTo(bx + bw * 0.5, by + h * 0.2); c.lineTo(bx + bw * 0.42, by + h * 0.5); c.lineTo(bx + bw * 0.56, by + h * 0.75); this.ink(PORTRAIT ? 4 : 3); }
-        if (alt < 0.35 && alt > -0.3 && hh > 0.93) this.pine(bx + bw * 0.55, by, R / 84);
-      }
-    }
-    this.drawCave(span * CAVE_AT, R);
-    this.drawFall(span * FALL_AT, R);
+    this.drawStones(true, R);
+    c.restore();
+    this.drawStones(false, R);
+    this.drawCave(R);
+    this.drawFall(R);
+    this.drawCaps();
   }
+  /** The stones on screen that do (or don't) cross the ridge line, a few batched paths instead of one per stone. */
+  private drawStones(clipped: boolean, R: number) {
+    const c = this.ctx, v = this.view, seen = this.seen, lw = PORTRAIT ? 4 : 3;
+    seen.length = 0;
+    for (const b of this.cliff.blocks) if (b.clip === clipped && b.x <= v.x1 && b.x + b.w >= v.x0 && b.y <= v.y1 && b.y + b.h >= v.y0) seen.push(b);
+    if (!seen.length) return;
+    for (let i = 0; i < seen.length;) {
+      const fill = seen[i].fill;
+      c.beginPath();
+      for (; i < seen.length && seen[i].fill === fill; i++) { const b = seen[i]; c.roundRect(b.x, b.y, b.w, b.h, R * 0.28); }
+      c.fillStyle = fill; c.fill();
+    }
+    c.beginPath();
+    for (const b of seen) {
+      c.roundRect(b.x, b.y, b.w, b.h, R * 0.28);
+      if (b.deco === 'crack') { c.moveTo(b.x + b.w * 0.5, b.y + b.h * 0.2); c.lineTo(b.x + b.w * 0.42, b.y + b.h * 0.5); c.lineTo(b.x + b.w * 0.56, b.y + b.h * 0.75); }
+    }
+    this.ink(lw);
+    // Lit top edges
+    c.beginPath();
+    for (const b of seen) { c.moveTo(b.x + R * 0.2, b.y + 5); c.lineTo(b.x + b.w - R * 0.25, b.y + 5); }
+    c.lineWidth = PORTRAIT ? 6 : 4; c.strokeStyle = 'rgba(190,175,230,.45)'; c.stroke();
+    c.beginPath();
+    for (const b of seen) if (b.deco === 'moss') this.moss(b.x + b.w * 0.25, b.y, b.w * 0.5, R);
+    this.fillInk(C.grass, PORTRAIT ? 3.5 : 2.5);
+    c.beginPath();
+    for (const b of seen) if (b.deco === 'snow') this.snowCap(b.x, b.y, b.w, R);
+    this.fillInk('#fff', PORTRAIT ? 3.5 : 2.5);
+    for (const b of seen) if (b.pine) this.pine(b.x + b.w * 0.55, b.y, R / 84);
+  }
+  /** Adds a tuft of moss to the current path. */
   private moss(x: number, y: number, w: number, R: number) {
     const c = this.ctx, n = 3, r = R * 0.1;
-    c.beginPath(); c.moveTo(x, y + r);
+    c.moveTo(x, y + r);
     for (let k = 0; k < n; k++) c.arc(x + (w / n) * (k + 0.5), y + r * 0.6, w / n / 2, Math.PI, 0);
     c.lineTo(x + w, y + r * 1.4); c.lineTo(x, y + r * 1.4); c.closePath();
-    this.fillInk(C.grass, PORTRAIT ? 3.5 : 2.5);
   }
+  /** Adds a cap of snow to the current path. */
   private snowCap(x: number, y: number, w: number, R: number) {
     const c = this.ctx, d = R * 0.16;
-    c.beginPath(); c.moveTo(x + R * 0.15, y - 2); c.lineTo(x + w - R * 0.15, y - 2);
+    c.moveTo(x + R * 0.15, y - 2); c.lineTo(x + w - R * 0.15, y - 2);
     c.quadraticCurveTo(x + w - R * 0.1, y + d, x + w - R * 0.3, y + d * 0.9);
     c.quadraticCurveTo(x + w * 0.55, y + d * 1.6, x + w * 0.45, y + d);
     c.quadraticCurveTo(x + w * 0.3, y + d * 1.4, x + R * 0.2, y + d);
-    c.closePath(); this.fillInk('#fff', PORTRAIT ? 3.5 : 2.5);
+    c.closePath();
   }
   private pine(x: number, y: number, k: number) {
     const c = this.ctx;
@@ -553,41 +699,59 @@ export class Scene {
     for (let t = 0; t < 3; t++) { c.beginPath(); c.moveTo(-13 + t * 3, -4 - t * 11); c.lineTo(0, -20 - t * 11); c.lineTo(13 - t * 3, -4 - t * 11); c.closePath(); this.fillInk(C.grassD, 3); }
     c.restore();
   }
-  /** A cave mouth cut into the cliff, with eyes that blink now and then. */
-  private drawCave(x: number, R: number) {
-    const c = this.ctx, y = CAP - (x / SW) * SH + R * 2.6, s = R / 84;
-    c.save(); c.translate(x, y); c.scale(s * 1.4, s * 1.4);
+  private cavePos(R: number) { const x = edgeX() * CAVE_AT; return { x, y: CAP - (x / SW) * SH + R * 2.6, s: (R / 84) * 1.4 }; }
+  /** A cave mouth cut into the cliff (its eyes blink in drawCliffLife). */
+  private drawCave(R: number) {
+    const c = this.ctx, p = this.cavePos(R);
+    c.save(); c.translate(p.x, p.y); c.scale(p.s, p.s);
     c.beginPath(); c.moveTo(-34, 6); c.quadraticCurveTo(-36, -50, 0, -52); c.quadraticCurveTo(36, -50, 34, 6); c.closePath(); this.fillInk('#140E22', 5);
     c.beginPath(); c.moveTo(-40, 6); c.lineTo(40, 6); this.ink(6);
-    if (Math.floor(this.clock / 2600) % 3 !== 0 && this.clock % 2600 > 180) { this.ellipse(-8, -22, 4, 4.5); this.ellipse(8, -22, 4, 4.5); c.fillStyle = C.gold; c.fill(); }
     c.restore();
   }
-  /** A waterfall spilling from the ridge's lip down the stones into a splash pool. */
-  private drawFall(x: number, R: number) {
-    const c = this.ctx, s = R / 84;
-    const top = stepTop(Math.floor(x / SW)) + CAP * 0.6, bottom = top + R * 3.2, w = 9 * s;
+  private fallPos(R: number) {
+    const x = edgeX() * FALL_AT, s = R / 84, top = stepTop(Math.floor(x / SW)) + CAP * 0.6;
+    return { x, s, top, bottom: top + R * 3.2, w: 9 * s };
+  }
+  /** A waterfall spilling from the ridge's lip down the stones into a splash pool (its water runs in drawCliffLife). */
+  private drawFall(R: number) {
+    const c = this.ctx, { x, s, top, bottom, w } = this.fallPos(R);
     c.beginPath(); c.moveTo(x - w, top); c.lineTo(x + w, top); c.lineTo(x + w * 1.5, bottom); c.lineTo(x - w * 1.5, bottom); c.closePath(); this.fillInk('#BFE4F7', 3);
-    c.save(); c.clip(); c.strokeStyle = '#fff'; c.lineWidth = 2 + s * 2;
-    const len = bottom - top;
-    for (let d = 0; d < 6; d++) { const yy = top + ((this.clock * 0.12 + (d * len) / 6) % len); c.beginPath(); c.moveTo(x - w * 0.4, yy); c.lineTo(x - w * 0.4, yy + 14 * s); c.moveTo(x + w * 0.5, yy + 7 * s); c.lineTo(x + w * 0.5, yy + 20 * s); c.stroke(); }
-    c.restore();
     this.ellipse(x, bottom, 26 * s, 9 * s); this.fillInk('#E5F6FF', 3);
     this.ellipse(x - 18 * s, bottom - 8 * s, 6 * s, 6 * s); this.ellipse(x + 20 * s, bottom - 10 * s, 5 * s, 5 * s); c.fillStyle = '#fff'; c.fill();
   }
+  /** What moves in the cliff, drawn live over the rock: the cave's blinking eyes and the falling water. */
+  private drawCliffLife() {
+    const c = this.ctx, R = blockSize();
+    const cave = this.cavePos(R);
+    if (Math.floor(this.clock / 2600) % 3 !== 0 && this.clock % 2600 > 180) {
+      c.save(); c.translate(cave.x, cave.y); c.scale(cave.s, cave.s);
+      this.ellipse(-8, -22, 4, 4.5); this.ellipse(8, -22, 4, 4.5); c.fillStyle = C.gold; c.fill();
+      c.restore();
+    }
+    const { x, s, top, bottom, w } = this.fallPos(R), len = bottom - top;
+    // (stopping short of the splash pool, which the streaks used to run behind)
+    // (and starting below the lip's scallops, which are painted under them with the rock)
+    const clipTop = top + CAP * 0.55, clipBottom = bottom - 9 * s, wAt = (y: number) => w * (1 + (0.5 * (y - top)) / len);
+    c.save();
+    c.beginPath(); c.moveTo(x - wAt(clipTop), clipTop); c.lineTo(x + wAt(clipTop), clipTop); c.lineTo(x + wAt(clipBottom), clipBottom); c.lineTo(x - wAt(clipBottom), clipBottom); c.closePath(); c.clip();
+    c.strokeStyle = '#fff'; c.lineWidth = 2 + s * 2;
+    c.beginPath();
+    for (let d = 0; d < 6; d++) { const yy = top + ((this.clock * 0.12 + (d * len) / 6) % len); c.moveTo(x - w * 0.4, yy); c.lineTo(x - w * 0.4, yy + 14 * s); c.moveTo(x + w * 0.5, yy + 7 * s); c.lineTo(x + w * 0.5, yy + 20 * s); }
+    c.stroke();
+    c.restore();
+  }
 
   // ---------- the ridge ----------
-  private drawRidge() {
-    const c = this.ctx;
-    const stair = () => {
-      c.beginPath(); c.moveTo(-3200, 0);
-      for (let i = 0; i <= TOP; i++) { c.lineTo(i * SW + this.jit(i), stepTop(i) + this.jit(i + 50)); c.lineTo((i + 1) * SW, stepTop(i) + this.jit(i + 99)); }
-      c.lineTo(edgeX() + this.jit(7), 2400);
-    };
-    stair(); c.lineTo(-3200, 2400); c.closePath();
-    c.fillStyle = C.mass; c.fill();
-    c.save(); c.clip();
-    this.drawFace();
-    c.restore();
+  /** The ridge's stair-step top edge as an open path, boiling unless `jitter` is off. */
+  private stair(jitter: boolean) {
+    const c = this.ctx, j = (k: number) => (jitter ? this.jit(k) : 0);
+    c.beginPath(); c.moveTo(-3200, 0);
+    for (let i = 0; i <= TOP; i++) { c.lineTo(i * SW + j(i), stepTop(i) + j(i + 50)); c.lineTo((i + 1) * SW, stepTop(i) + j(i + 99)); }
+    c.lineTo(edgeX() + j(7), 2400);
+  }
+  /** Each step's turf (grass, rock, snow) with its scalloped lip; static, so it's painted with the rock. */
+  private drawCaps() {
+    const c = this.ctx, v = this.view;
     const cap = (x0: number, x1: number, top: number, i: number) => {
       const [fill, dark] = i <= 9 ? [C.grass, C.grassD] : i <= 19 ? [C.rock, C.rockD] : [C.snow, C.snowD];
       c.beginPath(); c.moveTo(x0, top); c.lineTo(x1, top); c.lineTo(x1, top + CAP * 0.6);
@@ -599,19 +763,27 @@ export class Scene {
       c.closePath(); c.fillStyle = fill; c.fill(); this.ink(3);
       c.fillStyle = dark; c.fillRect(x0 + 3, top + CAP * 0.45, x1 - x0 - 6, 4);
     };
+    // (base camp's cap always spans the same stretch, so its scallops stay put as the camera moves)
     cap(-3200, SW, 0, 0);
-    for (let i = 1; i <= TOP; i++) cap(i * SW, (i + 1) * SW, stepTop(i), i);
-    stair(); this.ink(6);
-    for (let i = 0; i <= TOP; i++) {
-      const top = stepTop(i), d = DECO[i];
-      if (i <= 9) d.tufts.forEach((f) => {
-        const x = i * SW + f * SW;
-        c.beginPath(); c.moveTo(x - 7, top); c.lineTo(x - 4, top - 10); c.lineTo(x, top - 2); c.lineTo(x + 4, top - 12); c.lineTo(x + 7, top);
-        c.fillStyle = C.grassD; c.fill(); this.ink(2.5);
-      });
-      if (i > 9 && i <= 19 && d.rock) { this.ellipse(i * SW + d.rockX * SW, top - 6, 11, 8); this.fillInk('#D4C8EA', 3); }
-      if (i > 19 && hash(i + Math.floor(this.clock / 400)) > 0.7) { const x = i * SW + d.rockX * SW; c.fillStyle = '#fff'; c.fillRect(x - 1, top - 14, 2, 8); c.fillRect(x - 4, top - 11, 8, 2); }
+    for (let i = 1; i <= TOP; i++) if ((i + 1) * SW >= v.x0 && i * SW <= v.x1) cap(i * SW, (i + 1) * SW, stepTop(i), i);
+  }
+  private drawRidge() {
+    const c = this.ctx;
+    this.drawRock();
+    this.drawCliffLife();
+    this.stair(true); this.ink(6);
+    // Grass tufts low down, boulders midway, glints on the snow up top
+    c.beginPath();
+    for (let i = 0; i <= 9; i++) for (const f of DECO[i].tufts) {
+      const x = i * SW + f * SW, top = stepTop(i);
+      c.moveTo(x - 7, top); c.lineTo(x - 4, top - 10); c.lineTo(x, top - 2); c.lineTo(x + 4, top - 12); c.lineTo(x + 7, top);
     }
+    this.fillInk(C.grassD, 2.5);
+    c.beginPath();
+    for (let i = 10; i <= 19; i++) if (DECO[i].rock) { const x = i * SW + DECO[i].rockX * SW, y = stepTop(i) - 6; c.moveTo(x + 11, y); c.ellipse(x, y, 11, 8, 0, 0, Math.PI * 2); }
+    this.fillInk('#D4C8EA', 3);
+    c.fillStyle = '#fff';
+    for (let i = 20; i <= TOP; i++) if (hash(i + Math.floor(this.clock / 400)) > 0.7) { const x = i * SW + DECO[i].rockX * SW, top = stepTop(i); c.fillRect(x - 1, top - 14, 2, 8); c.fillRect(x - 4, top - 11, 8, 2); }
     c.save(); c.translate(-220, 0);
     c.beginPath(); c.moveTo(-60, 0); c.lineTo(0, -80); c.lineTo(60, 0); c.closePath(); this.fillInk(C.red, 5);
     c.beginPath(); c.moveTo(-14, 0); c.lineTo(0, -40); c.lineTo(14, 0); c.closePath(); this.fillInk('#5A2030', 4);
@@ -629,9 +801,14 @@ export class Scene {
     const pulse = 0.5 + 0.5 * Math.sin(this.clock / 260);
     if (w === 'edge') {
       const top = stepTop(TOP);
-      const g = c.createLinearGradient(edgeX(), 0, edgeX() + 500, 0);
-      g.addColorStop(0, `rgba(226,56,63,${0.35 + 0.15 * pulse})`); g.addColorStop(1, 'rgba(226,56,63,0)');
-      c.fillStyle = g; c.fillRect(edgeX(), top, 500, 1400);
+      c.save(); c.translate(edgeX(), top);
+      c.fillStyle = this.gradient('edge', () => {
+        const g = c.createLinearGradient(0, 0, 500, 0);
+        g.addColorStop(0, 'rgba(226,56,63,1)'); g.addColorStop(1, 'rgba(226,56,63,0)');
+        return g;
+      });
+      c.globalAlpha = 0.35 + 0.15 * pulse; c.fillRect(0, 0, 500, 1400);
+      c.restore();
       this.flag(edgeX() + 40, top + 120, 'EDGE', C.red, -1);
       return;
     }
@@ -905,9 +1082,12 @@ export class Scene {
   private drawVignette() {
     if (this.tension < 0.02) return;
     const c = this.ctx, pulse = 0.85 + 0.15 * Math.sin(performance.now() / 130);
-    const g = c.createRadialGradient(this.W / 2, this.H / 2, 160, this.W / 2, this.H / 2, Math.max(this.W, this.H) * 0.6);
-    g.addColorStop(0, 'rgba(40,0,20,0)'); g.addColorStop(1, `rgba(60,0,25,${0.6 * this.tension * pulse})`);
-    c.fillStyle = g; c.fillRect(0, 0, this.W, this.H);
+    c.fillStyle = this.gradient(`vignette ${this.W} ${this.H}`, () => {
+      const g = c.createRadialGradient(this.W / 2, this.H / 2, 160, this.W / 2, this.H / 2, Math.max(this.W, this.H) * 0.6);
+      g.addColorStop(0, 'rgba(40,0,20,0)'); g.addColorStop(1, 'rgba(60,0,25,.6)');
+      return g;
+    });
+    c.globalAlpha = this.tension * pulse; c.fillRect(0, 0, this.W, this.H); c.globalAlpha = 1;
   }
   private drawWin() {
     const w = this.win;
@@ -928,6 +1108,7 @@ export class Scene {
     const c = this.ctx, P = SKY[this.weather];
     c.setTransform(this.canvas.width / this.W, 0, 0, this.canvas.height / this.H, 0, 0);
     const shx = this.reduce ? 0 : (Math.random() - 0.5) * this.shake * 22, shy = this.reduce ? 0 : (Math.random() - 0.5) * this.shake * 22;
+    this.shook.x = shx; this.shook.y = shy;
     c.save(); c.translate(shx, shy);
     this.drawSky();
     this.drawRange(FAR, 0.05, this.H * 0.61, P.far, P.farSnow, 3);

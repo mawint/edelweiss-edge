@@ -31,5 +31,7 @@ All take `--url` (default `http://localhost:5200/`, the dev server).
 | --- | --- |
 | `probes/rounds.mjs [--modes easy_10,pinpoint_13,edge] [--n 4]` | plays rounds in each mode: each is staged to its end and the balance moves by exactly the payout less the bet (exits 1 on a failure) |
 | `probes/screenshot.mjs [--size 390x844] [--out qa/results/screenshot.png] [--playing]` | a phone screenshot, and whether the page scrolls sideways |
+| `probes/frames.mjs [--size 1280x720] [--mode medium_11] [--every 2500] [--n 8]` | screenshots of one animated round at intervals |
+| `probes/perf.mjs [--size 390x844] [--dpr 3] [--cpu 4] [--mode medium_11] [--idle]` | frame timing on a throttled phone over a fixed round (or the idle overview): fps, render ms, time per draw step and canvas calls per frame. Headless Chrome doesn't raster like a phone GPU, so read the canvas calls as the GPU's load and compare runs, not machines |
 
 The regression runner, metrics and physics harness of the coin pushers (`run.mjs`, `metrics.mjs`, `harness/`) were left out: they measure coins and cards. Add a runner like them when the climb has real staging worth comparing between builds.

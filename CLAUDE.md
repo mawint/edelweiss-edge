@@ -32,6 +32,7 @@ Before starting work, find out where things stand:
 - The screen: `src/scene.ts` draws the mountain on a canvas (alpine cartoon) and only animates what it's told; `src/director.ts` turns a book into scene beats; `src/sound.ts` synthesizes every sound behind one mute. Cosmetic randomness (weather, teases) is seeded from the book id so replays match. The rules screen is `src/rules.ts`, built from the exported numbers; its phrases go through `w(normal, social)`.
 - Fonts are bundled from `@fontsource` (no Google Fonts: the Stake build may not load external hosts).
 - `node qa/probes/frames.mjs` screenshots an animated round at intervals; the browser pane pauses animation when hidden.
+- `src/scene.ts` draws every frame: keep per-frame work batched and allocation-free (static art goes in the rock layer or a sprite), and check `node qa/probes/perf.mjs` canvas calls before and after.
 - Saved data uses `edelweiss.*` keys, never another game's (all the games run on localhost).
 - Ports: 5200 dev, 4200 preview, 4201 Stake preview.
 - Both repos are public: never commit secrets. The demo's password is the `SITE_PASSWORD` Netlify environment variable.
