@@ -144,6 +144,28 @@ small { display: block; font-weight: 500; font-size: 11px; color: var(--muted); 
   margin: 0; font-family: var(--display); font-weight: 400; font-size: clamp(40px, 11vmin, 96px); line-height: 1; color: var(--gold);
   text-shadow: 4px 4px 0 var(--ink), -3px -3px 0 var(--ink), 3px -3px 0 var(--ink), -3px 3px 0 var(--ink), 0 8px 0 var(--ink);
 }
+/* How to play: three cream cards, side by side */
+.how {
+  list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(6px, 1.6vmin, 14px);
+  width: min(100%, 720px); counter-reset: how;
+}
+.how li {
+  counter-increment: how; position: relative; display: grid; justify-items: center; align-content: start; gap: 2px;
+  padding: 18px clamp(6px, 1.6vmin, 14px) clamp(8px, 1.6vmin, 12px);
+  background: var(--cream); border: 3px solid var(--ink); border-radius: 16px; box-shadow: 0 4px 0 var(--ink);
+}
+.how li::before {
+  content: counter(how); position: absolute; top: -13px; left: 50%; translate: -50% 0; width: 26px; height: 26px; border-radius: 50%;
+  display: grid; place-items: center; padding-top: 0.2em; font-family: var(--display); font-size: 15px; line-height: 1;
+  background: var(--gold); border: 3px solid var(--ink);
+}
+.how svg { width: clamp(54px, 10vmin, 84px); height: auto; overflow: visible; }
+.how b { font-family: var(--display); font-weight: 400; font-size: clamp(13px, 2.6vmin, 19px); line-height: 1.1; padding-top: 0.15em; }
+.how span { font-weight: 700; font-size: clamp(11px, 1.9vmin, 14px); line-height: 1.25; color: var(--muted); }
+/* (short screens: no flower over the logo, then the cards lose their pictures, then the popout drops them) */
+@media (max-height: 520px) { .flower { display: none; } .how svg { display: none; } }
+@media (max-height: 360px) { .how span { display: none; } }
+@media (max-height: 300px) { .how { display: none; } }
 .load { width: min(64vw, 340px); display: grid; gap: 8px; justify-items: center; }
 .load[hidden] { display: none; }
 .track { width: 100%; height: 18px; border: 4px solid var(--ink); border-radius: 12px; background: var(--cream); overflow: hidden; box-shadow: 0 4px 0 var(--ink); }
