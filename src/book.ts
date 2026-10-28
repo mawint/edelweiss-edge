@@ -1,5 +1,5 @@
 // Rounds as the math decides them. Each round is one "book" from the math repo
-// (mawint/edelweiss-edge-math, games/edelweiss_edge): a list of events saying how Ueli climbs and what
+// (CopperwickStudios/game-math, games/edelweiss_edge): a list of events saying how Ueli climbs and what
 // the round pays. The game stages those events; it never decides an outcome or adds up money itself.
 // The events are listed in docs/GAME_DESIGN.md (Book events).
 //

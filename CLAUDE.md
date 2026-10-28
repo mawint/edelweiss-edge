@@ -5,8 +5,8 @@ An alpine climbing game for Stake Engine. It was set up from Thunder Push's repo
 Before starting work, find out where things stand:
 
 - **Status (done, next, open questions):** `docs/STATUS.md`. Read it first, and update it when work lands.
-- **The design:** `docs/GAME_DESIGN.md` covers the climb, the bets, features, blooms, bet modes and book events. The same file is in the math repo; change both together.
-- **How rounds work:** the math decides every round up front (a "book"). The game only stages it and pays the book's total. The math lives in mawint/edelweiss-edge-math (`games/edelweiss_edge/`). For background on the engine, see Thunder Push's `docs/from-sweet-push/`.
+- **The design:** `docs/GAME_DESIGN.md` covers the climb, the bets, features, blooms, bet modes and book events. It lives here only; the math repo points to it.
+- **How rounds work:** the math decides every round up front (a "book"). The game only stages it and pays the book's total. The math lives in CopperwickStudios/game-math (`games/edelweiss_edge/`). For background on the engine, see Thunder Push's `docs/from-sweet-push/`.
 - **Before submitting:** run `engine-review-prompt.md` against the game.
 
 ## The game in brief
@@ -20,7 +20,7 @@ Before starting work, find out where things stand:
 - **Book events:** `reveal`, `climb`, `feature`, `bloom`, `fall`, `settle`, then the SDK's `wincap`/`finalWin`.
 
 ## Commands
-- `npm run dev`: the game on port 5200, plus a mock Stake RGS at `/rgs`. It serves `../edelweiss-edge-math` books if present, else `fixtures/books.json`.
+- `npm run dev`: the game on port 5200, plus a mock Stake RGS at `/rgs`. It serves `../game-math` books if present, else `fixtures/books.json`.
 - `npm test`: the fixtures against the design, the RGS client and mock, and social wording.
 - `npm run build:stake`: the Stake upload (`dist-stake/`).
 - `node qa/probes/<probe>.mjs`: QA probes (see `qa/README.md`).

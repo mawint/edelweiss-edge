@@ -6,7 +6,7 @@ An alpine climbing game for Stake Engine. Ueli, a yodeler with an alphorn, climb
 
 - Design: [docs/GAME_DESIGN.md](docs/GAME_DESIGN.md)
 - Status: [docs/STATUS.md](docs/STATUS.md)
-- Math: mawint/edelweiss-edge-math
+- Math: [CopperwickStudios/game-math](https://github.com/CopperwickStudios/game-math) (`games/edelweiss_edge/`)
 
 ## Run
 ```bash

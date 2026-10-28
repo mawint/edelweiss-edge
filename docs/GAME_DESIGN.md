@@ -2,7 +2,7 @@
 
 An alpine climbing game for Stake Engine. Ueli, a yodeler with an alphorn, climbs a ridge in three climbs. Before he sets off, the player places a window on the ridge, and wins if he stops inside it. The higher up the ridge, the rarer the stop and the more it pays: the risk is falling.
 
-This file lives in both repos (the game, `mawint/edelweiss-edge`, and the math, `mawint/edelweiss-edge-math`). Change both together.
+The math (CopperwickStudios/game-math, `games/edelweiss_edge/`) follows this file, and its tests check the numbers. Change the math when this changes.
 
 ## The ridge
 

@@ -1,6 +1,6 @@
 // The mock RGS on the dev server (`npm run dev`), at /rgs. It serves the math repo's full published
 // books, so local play uses the real distribution; without them it falls back to the fixtures.
-//   EDELWEISS_MATH=/path/to/publish_files   (default: ../edelweiss-edge-math/games/edelweiss_edge/library/publish_files)
+//   EDELWEISS_MATH=/path/to/publish_files   (default: ../game-math/games/edelweiss_edge/library/publish_files)
 // Open the game with ?sessionID=…&rgs_url=localhost:5173/rgs (the game does this itself in dev).
 import fs from 'node:fs';
 import path from 'node:path';
@@ -37,7 +37,7 @@ function readMode(dir: string, entry: { name: string; cost: number; events: stri
 }
 
 function loadSource(root: string, log: (msg: string) => void): MockSource {
-  const dir = process.env.EDELWEISS_MATH ?? path.resolve(root, '../edelweiss-edge-math/games/edelweiss_edge/library/publish_files');
+  const dir = process.env.EDELWEISS_MATH ?? path.resolve(root, '../game-math/games/edelweiss_edge/library/publish_files');
   const index = path.join(dir, 'index.json');
   // (tests run a Vite server too: they play the fixtures, never a gigabyte of books)
   if (!fs.existsSync(index) || process.env.VITEST) {

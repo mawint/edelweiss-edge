@@ -4,7 +4,7 @@ Last updated October 17, 2026.
 
 ## Done
 - **Repos set up** from Thunder Push's (thunder-push and thunder-push-math): the RGS client, mock RGS, fixtures pipeline, QA harness (Chrome client, static server, build-ref) and CI. All Thunder Push code, art, copy and math has been removed.
-- **Math, second pass** (`edelweiss-edge-math`, `games/edelweiss_edge/`):
+- **Math, second pass** (now in CopperwickStudios/game-math, `games/edelweiss_edge/`, moved from mawint/edelweiss-edge-math):
   - the stop is drawn first from height-based weights, so pay rises toward the edge;
   - stories with calibrated features act it out;
   - blooms are independent of the stop;
